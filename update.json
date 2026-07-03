@@ -1,6 +1,6 @@
 {
-  "versionCode": 118,
-  "versionName": "1.1.8",
-  "updateUrl": "https://gh-proxy.com/https://github.com/sfee1212/moyutv/releases/download/v1.1.8/moyu_v1.1.8.apk",
-  "updateInfo": "1.手机端双击节目名调出回放。\n2. 调整默认解码为EXO，如播放无声音请切换到MPV解码。 "
+  "versionCode": 119,
+  "versionName": "1.1.9",
+  "updateUrl": "https://gh-proxy.com/https://github.com/sfee1212/moyutv/releases/download/v1.1.9/moyu_v1.1.9.apk",
+  "updateInfo": "1.手机端双击节目名调出回放。\n2. 调整默认解码为EXO，如播放无声音请切换到MPV解码。\n3. 修复升级安卓内核导致JS脚本故障。\n4. 修复PnP源正常播放。 "
 }
