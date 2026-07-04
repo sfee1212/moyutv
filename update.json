@@ -1,6 +1,6 @@
 {
-  "versionCode": 116,
-  "versionName": "1.1.6",
-  "updateUrl": "https://gh-proxy.com/https://github.com/sfee1212/moyutv/releases/download/v1.1.6/moyu_v1.1.6.apk",
-  "updateInfo": "1.手机端双击节目名调出回放。\n2. 调整默认解码为EXO，如播放无声音请切换到MPV解码。\n3. 修复升级安卓内核导致JS脚本故障。\n4. 修复PnP源正常播放。 "
+  "versionCode": 120,
+  "versionName": "1.2.0",
+  "updateUrl": "https://gh-proxy.com/https://github.com/sfee1212/moyutv/releases/download/v1.2.0/moyu_v1.2.0.apk",
+  "updateInfo": "1.多组自定义 SOCKS5 及分类代理分配。\n2. 代理订阅池测速，可选择代理池中的线路。\n3. 自动加载 摸鱼TV/list 中的列表文件。 "
 }
