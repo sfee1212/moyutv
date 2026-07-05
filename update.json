@@ -1,6 +1,6 @@
 {
-  "versionCode": 121,
-  "versionName": "1.2.1",
-  "updateUrl": "https://gh-proxy.com/https://github.com/sfee1212/moyutv/releases/download/v1.2.1/moyu_1.2.1.apk",
-  "updateInfo": "1.MPV内核播放AV3A类源声画完美。\n2. 修复上个版本对某些源的解码问题。\n3. UI调整。 "
+  "versionCode": 122,
+  "versionName": "1.2.2",
+  "updateUrl": "https://gh-proxy.com/https://github.com/sfee1212/moyutv/releases/download/v1.2.2/moyu_1.2.2.apk",
+  "updateInfo": "1.提高低版本安卓系统MPV内核兼容性。\n2. 修复节目列表读取问题。\n3. SOCKS5/HTTP/HTTPS 代理全支持，代理可以混写在同一个列表里，播放器会自动分辨、自动验证有效性。 "
 }
