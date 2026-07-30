@@ -2,5 +2,5 @@
   "versionCode": 123,
   "versionName": "1.2.3",
   "updateUrl": "https://gh-proxy.com/https://github.com/sfee1212/moyutv/releases/download/v1.2.3/moyu_test_1.2.3.apk",
-  "updateInfo": "1.全新测试版，使用CatVod源码同摸鱼整合。\n2. 目前已实现PnP、socks5、JS脚本等正常播放。其他功能还在升级中。 "
+  "updateInfo": "1.全新测试版，使用CatVod源码同摸鱼整合。\n2. 目前已实现PnP、socks5、JS脚本等正常播放。已内置python运行环境，可以测试PY脚本，其他功能还在升级中。 "
 }
