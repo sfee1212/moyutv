@@ -1,6 +1,6 @@
 {
-  "versionCode": 122,
-  "versionName": "1.2.2",
-  "updateUrl": "https://gh-proxy.com/https://github.com/sfee1212/moyutv/releases/download/v1.2.2/moyu_1.2.2.apk",
-  "updateInfo": "1.提高低版本安卓系统MPV内核兼容性。\n2. 修复节目列表读取问题。\n3. SOCKS5/HTTP/HTTPS 代理全支持，代理可以混写在同一个列表里，播放器会自动分辨、自动验证有效性。 "
+  "versionCode": 123,
+  "versionName": "1.2.3",
+  "updateUrl": "https://gh-proxy.com/https://github.com/sfee1212/moyutv/releases/download/v1.2.3/moyu_test_1.2.3.apk",
+  "updateInfo": "1.全新测试版，使用CatVod源码同摸鱼整合。\n2. 目前已实现PnP、socks5、JS脚本等正常播放。其他功能还在升级中。 "
 }
