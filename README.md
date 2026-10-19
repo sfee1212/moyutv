@@ -15,13 +15,12 @@
 *   **MPV Player**: 集成自研 JNI 及 `libmpv.so`，彻底解决部分老旧电视盒子因缺少硬件解码器而导致部分频道**有图无声 (AC3/MP2 音频格式)** 的问题。
 
 ### 2. ⚡ 媒体格式全支持
-*   **socks5**: 示例格式: CCTV1,sk://ip:port&http://live2.rxip.sc96655.com/live/CCTV-1H265_4000.m3u8?E=1&U=1&A=1&K=1&P=1&S=1
-*   1.2.3以后版示例格式：
-*   CCTV1,http://target.m3u8?q=1&socks5://host:port
+*   **socks5**: 示例格式: 
+*   CCTV1,http://target.m3u8&socks5://host:port
 *   CCTV1,http://target.m3u8?socks5://host:port
-*   CCTV1,http://target.m3u8?q=1&socks5=host:port
+*   CCTV1,http://target.m3u8&socks5=host:port
 *   CCTV1,http://target.m3u8?socks5=host:port
-*   CCTV1,socks5://host:port/http://target.m3u
+*   CCTV1,socks5://host:port/http://target.m3u8
 *   CCTV1,http://target.m3u8&http_proxy=host:port
 *   CCTV1,http://target.m3u8?http_proxy=host:port
 *   CCTV1,http://target.m3u8&http_proxy://host:port
