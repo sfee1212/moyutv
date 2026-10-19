@@ -29,8 +29,8 @@
 。
 *   **webview**: 示例格式: CCTV1,webview://https://yangshipin.cn/tv/home?pid=600001859
 
-### 3. ⚡ JS 脚本支持
-*   **本地脚本**: 本地的 JS 脚本（比如 migu.js）塞进电视机根目录下的 摸鱼TV/js 文件夹里，然后在直播源里写 local://migu.js/63178053
+### 3. ⚡ PHP/Python/JS 脚本支持
+*   **本地脚本**: 本地的 PHP/Python/JS 脚本（比如 migu.js）塞进电视机根目录下的 摸鱼TV/js 文件夹里，然后在直播源里写 local://migu.js/63178053
 。
 *   **远程脚本**: JS 脚本（比如 migu.js）放在远程服务器、空间、网盘里，然后在直播源里写 https://你的远程地址/migu.js/63178053
 
