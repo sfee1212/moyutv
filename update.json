@@ -2,6 +2,6 @@
   "versionCode": 125,
   "versionName": "1.2.5",
   "updateUrl": "https://gh-proxy.com/https://github.com/sfee1212/moyutv/releases/download/v1.2.5/moyu_v1.2.5.apk",
-  "updateInfo": "1.增加节目收藏功能。\n2. 全面支持本地脚本播放｜PHP/Python/JS，无需远程服务器。所有脚本（php、py、js）全部存放在**对应的本地目录内**，不需要部署远程服务器，通过 local:// 本地协议调用脚本，附带参数就能完成播放。
+  "updateInfo": "1.增加节目收藏功能。\n2. 全面支持本地脚本播放PHP、Python、JS，无需远程服务器。所有脚本 php、py、js 全部存放在**对应的本地目录内**，不需要部署远程服务器，通过 local:// 本地协议调用脚本，附带参数就能完成播放。
 只需要按规范填写名称 + 地址，修改参数就能切换不同源。 "
 }
