@@ -1,4 +1,4 @@
-# Premium IPTV Player for Android TV
+# Premium IPTV Player for Android TV and PHP/Python/JS 脚本
 
 [![Platform](https://img.shields.io/badge/Platform-Android%20TV%20%2F%20Leanback-green.svg)](https://developer.android.com/tv)
 [![API Level](https://img.shields.io/badge/API-21%2B-blue.svg)](https://developer.android.com/about/dashboards)
