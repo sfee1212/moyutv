@@ -1,10 +1,15 @@
-# Premium IPTV Player for Android TV and PHP/Python/JS 脚本
+#  摸鱼 TV · moyutv
 
-[![Platform](https://img.shields.io/badge/Platform-Android%20TV%20%2F%20Leanback-green.svg)](https://developer.android.com/tv)
-[![API Level](https://img.shields.io/badge/API-21%2B-blue.svg)](https://developer.android.com/about/dashboards)
-[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
+![](https://img.shields.io/badge/Platform-Android%20TV%20%2F%20Box-2e7d32?style=flat-square&logo=android)
+![](https://img.shields.io/badge/API-21%2B-3ddc84?style=flat-square&logo=android)
+![](https://img.shields.io/badge/Language-Kotlin-7f52ff?style=flat-square&logo=kotlin)
+![](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
 
-一款专为 Android TV / 电视盒子打造的**高性能双引擎 IPTV 播放器**。针对大屏及遥控器操作进行了深度定制与极致优化，适配主流M3U/TXT列表文件、智能 EPG、多协议代理及软硬双解码支持。
+
+一款专为 Android TV / 电视盒子打造的**高性能双引擎 IPTV 播放器**。
+支持 TXT / M3U 列表与订阅、PHP / Python / JS 本地与远程脚本、CatVod(TVBox) 爬虫协议、EPG 节目单与回看，并针对遥控器大屏操作与弱网环境做了深度优化。
+
+> ⚠️ 本项目**不内置、不提供任何直播源与会员内容**，仅提供播放器与脚本运行能力。直播源的合法性由使用者自行负责，请勿用于非法用途。
 
 ---
 
