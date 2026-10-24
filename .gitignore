@@ -65,21 +65,33 @@ captures/
 Thumbs.db
 
 # ==========================================
-# 🛡️ 核心机密源码隔离区 (防抄袭不上传项目)
+# 本地反编译 / 乱码备份目录 (不纳入版本控制)
 # ==========================================
-# 1. 代理模块 (P2P及Socks5中转核心)
-app/src/main/java/com/iptv/tvplayer/proxy/ForceTVProxy.kt
-app/src/main/java/com/iptv/tvplayer/proxy/ProxyManager.kt
-app/src/main/java/com/iptv/tvplayer/proxy/SocksProxyServer.kt
+app/src/main/java_corrupted/
 
-# 2. 本地代理服务器
-app/src/main/java/com/iptv/tvplayer/server/LocalServer.kt
+# ==========================================
+# 根目录临时产物 (日志、分析脚本、反编译中间文件)
+# 只作用于项目根目录, 不影响 app/src 下的源码
+# ==========================================
+/logcat*
+/*.txt
+/*.py
+/*.js
+/*.php
+/*.html
+/*.zip
+/*.dex
+/*.sh
+/*.kt
+/*.java
+/*.json
+/*.class
 
-# 3. 核心流媒体解析与解密引擎
-app/src/main/java/com/iptv/tvplayer/data/PlaylistParser.kt
-
-# 4. EPG 模糊匹配调度算法
-app/src/main/java/com/iptv/tvplayer/data/EpgManager.kt
-
-# 5. 整个 main 源码目录隔离保护 (防止泄露至公共仓库)
-app/src/main/
+# 外部 APK / 反编译工作目录
+/ku9_apk/
+/temp_media3_sources/
+/新建文件夹 (2)/
+/cfr.jar
+/classes.dex
+/NativePlayerManager_decompiled.java
+/staged_main*.kt

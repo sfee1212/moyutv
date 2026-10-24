@@ -1,0 +1,85 @@
+﻿<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="400dp"
+    android:layout_height="match_parent"
+    android:layout_gravity="end"
+    android:orientation="vertical"
+    android:background="#E6111822"
+    android:paddingVertical="32dp"
+    android:paddingHorizontal="48dp"
+    android:visibility="gone"
+    android:id="@+id/settings_overlay_minimal">
+
+    <!-- Top Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="32dp">
+
+        <!-- Back Button -->
+        <LinearLayout
+            android:id="@+id/btn_settings_back"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:background="@drawable/bg_btn_dark"
+            android:gravity="center"
+            android:focusable="true"
+            android:focusableInTouchMode="true">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="← 返回"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/tv_settings_title"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="系统设置"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:layout_marginStart="16dp" />
+
+        <!-- Refresh Button -->
+        <LinearLayout
+            android:id="@+id/btn_settings_refresh"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:background="@drawable/bg_btn_dark"
+            android:gravity="center"
+            android:focusable="true"
+            android:focusableInTouchMode="true">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="↻ 刷新全部"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <com.iptv.tvplayer.ui.CustomRecyclerView
+        android:id="@+id/rv_settings_minimal"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="32dp"
+        android:focusable="false"
+        android:focusableInTouchMode="false"
+        android:descendantFocusability="afterDescendants" />
+
+</LinearLayout>
+

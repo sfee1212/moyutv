@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:focusable="true"
+    android:paddingVertical="8dp"
+    android:paddingHorizontal="16dp"
+    android:background="@drawable/item_focus_bg"
+    android:gravity="center_vertical">
+
+    <TextView
+        android:id="@+id/tv_channel_number"
+        android:layout_width="36dp"
+        android:layout_height="wrap_content"
+        android:textColor="@color/color_text_selector"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium"
+        android:background="@drawable/bg_channel_number"
+        android:gravity="center"
+        android:paddingVertical="2dp"
+        android:duplicateParentState="true" />
+
+    <ImageView
+        android:id="@+id/iv_channel_logo"
+        android:layout_width="32dp"
+        android:layout_height="24dp"
+        android:layout_marginStart="8dp"
+        android:scaleType="fitCenter"
+        android:visibility="gone"
+        android:duplicateParentState="true" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:orientation="vertical"
+        android:duplicateParentState="true">
+
+        <TextView
+            android:id="@+id/tv_channel_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/color_text_selector"
+            android:textSize="18sp"
+            android:duplicateParentState="true" />
+
+        <TextView
+            android:id="@+id/tv_channel_epg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#80FFFFFF"
+            android:textSize="10sp"
+            android:text="精彩节目"
+            android:layout_marginTop="2dp"
+            android:duplicateParentState="true" />
+    </LinearLayout>
+
+</LinearLayout>

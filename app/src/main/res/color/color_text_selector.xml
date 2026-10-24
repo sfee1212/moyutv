@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Focused -->
+    <item android:state_focused="true" android:color="#FFFFFF" />
+    <!-- Selected (Playing) -->
+    <item android:state_selected="true" android:color="#0099FF" />
+    <!-- Default -->
+    <item android:color="#B3FFFFFF" />
+</selector>

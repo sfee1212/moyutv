@@ -1,0 +1,548 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent">
+
+    <!-- Bottom Layer: Native Video Player Container -->
+    <FrameLayout
+        android:id="@+id/player_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent" />
+
+    <!-- Top Layer: OSD (On-Screen Display) UI -->
+    <FrameLayout
+        android:id="@+id/osd_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent">
+
+        <!-- Splash Screen / Loading Background -->
+        <ImageView
+            android:id="@+id/splash_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/splash_bg"
+            android:visibility="visible" />
+
+        <!-- Loading Text -->
+        <TextView
+            android:id="@+id/loading_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="正在加载数据..."
+            android:textColor="#FFFFFF"
+            android:textSize="24sp"
+            android:shadowColor="#000000"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="3"
+            android:visibility="gone" />
+
+        <!-- Buffering Spinner -->
+        <ProgressBar
+            android:id="@+id/buffering_spinner"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="center"
+            android:indeterminate="true"
+            android:indeterminateTint="#FFFFFF"
+            android:visibility="gone" />
+
+        <!-- Bottom Right Loading Indicator -->
+        <TextView
+            android:id="@+id/tv_loading_list"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="24dp"
+            android:text="正在加载..."
+            android:textColor="#BBFFFFFF"
+            android:textSize="20sp"
+            android:shadowColor="#000000"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="3"
+            android:visibility="gone" />
+
+        <!-- Bottom Right Network Speed Indicator -->
+        <TextView
+            android:id="@+id/tv_network_speed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="24dp"
+            android:text="0 KB/s"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:shadowColor="#000000"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="3"
+            android:visibility="visible" />
+
+
+
+        <!-- Channel Info Overlay (e.g. Top Right or Bottom) -->
+        <LinearLayout
+            android:id="@+id/info_overlay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_margin="32dp"
+            android:background="#99000000"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tv_channel_num"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="36sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_channel_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="28sp" />
+
+        </LinearLayout>
+
+        <!-- Main Channel Menu Overlay -->
+        <LinearLayout
+            android:id="@+id/menu_overlay"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="start"
+            android:background="@drawable/bg_menu_panel"
+            android:orientation="horizontal"
+            android:visibility="gone"
+            android:paddingVertical="16dp"
+            android:paddingHorizontal="16dp">
+
+            <!-- Left Navigation (Settings + Categories) -->
+            <LinearLayout
+                android:layout_width="100dp"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/btn_settings_top"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:paddingVertical="10dp"
+                    android:paddingHorizontal="10dp"
+                    android:background="@drawable/item_focus_bg"
+                    android:gravity="center">
+                    
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@android:drawable/ic_menu_preferences"
+                        android:tint="@color/color_text_category_selector"
+                        android:duplicateParentState="true" />
+                        
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="设置"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/color_text_category_selector"
+                        android:layout_marginStart="6dp"
+                        android:duplicateParentState="true" />
+                </LinearLayout>
+
+                <com.iptv.tvplayer.ui.CustomRecyclerView
+                    android:id="@+id/rv_categories"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:clipToPadding="false"
+                    android:focusable="false"
+                    android:focusableInTouchMode="false"
+                    android:descendantFocusability="afterDescendants" />
+            </LinearLayout>
+
+            <!-- Channels List -->
+            <com.iptv.tvplayer.ui.CustomRecyclerView
+                android:id="@+id/rv_channels"
+                android:layout_width="240dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:clipToPadding="false"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
+                android:descendantFocusability="afterDescendants" />
+
+            <LinearLayout
+                android:id="@+id/catchup_hint_tab"
+                android:layout_width="32dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="center_vertical"
+                android:background="@drawable/item_focus_bg"
+                android:focusable="true"
+                android:clickable="true"
+                android:paddingVertical="16dp"
+                android:gravity="center"
+                android:visibility="gone"
+                android:orientation="vertical">
+                
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="节&#10;目&#10;单&#10;》"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:lineSpacingExtra="4dp" />
+            </LinearLayout>
+
+            <!-- Catchup Panel (Merged into Menu Overlay) -->
+            <LinearLayout
+                android:id="@+id/catchup_panel"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:layout_marginStart="8dp"
+                android:visibility="gone">
+
+                <!-- Days Column -->
+                <com.iptv.tvplayer.ui.CustomRecyclerView
+                    android:id="@+id/rv_catchup_days"
+                    android:layout_width="100dp"
+                    android:layout_height="match_parent"
+                    android:paddingVertical="16dp"
+                    android:clipToPadding="false"
+                    android:focusable="false"
+                    android:descendantFocusability="afterDescendants" />
+
+                <!-- Divider -->
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="match_parent"
+                    android:background="#33FFFFFF" />
+
+                <!-- Programs Column -->
+                <com.iptv.tvplayer.ui.CustomRecyclerView
+                    android:id="@+id/rv_catchup_programs"
+                    android:layout_width="280dp"
+                    android:layout_height="match_parent"
+                    android:paddingVertical="16dp"
+                    android:clipToPadding="false"
+                    android:focusable="false"
+                    android:descendantFocusability="afterDescendants" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Curved Bottom OSD Bar -->
+        <RelativeLayout
+            android:id="@+id/bottom_osd_bar"
+            android:layout_width="800dp"
+            android:layout_height="140dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/bg_osd_bar"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:visibility="gone">
+
+            <!-- Left and Middle Area -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_toStartOf="@+id/osd_right_panel"
+                android:layout_marginEnd="16dp"
+                android:layout_marginTop="4dp">
+
+                <!-- Row 1: Channel Logo + Number + Name + Badges -->
+                <LinearLayout
+                    android:id="@+id/osd_row_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_alignParentTop="true">
+
+                    <TextView
+                        android:id="@+id/tv_osd_channel_name"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Channel"
+                        android:textColor="#FF00D2FF"
+                        android:textSize="19sp"
+                        android:textStyle="bold"
+                        android:layout_marginStart="0dp"
+                        android:singleLine="true" />
+
+                    <Space
+                        android:layout_width="16dp"
+                        android:layout_height="wrap_content" />
+
+                    <TextView
+                        android:id="@+id/tv_osd_badge_catchup"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="回看"
+                        android:textColor="#FFFFFF"
+                        android:textSize="10sp"
+                        android:background="@drawable/bg_badge"
+                        android:paddingHorizontal="4dp"
+                        android:paddingVertical="1dp"
+                        android:layout_marginEnd="8dp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/tv_osd_badge_res"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="HD"
+                        android:textColor="#CCCCCC"
+                        android:textSize="10sp"
+                        android:background="@drawable/bg_badge"
+                        android:paddingHorizontal="4dp"
+                        android:paddingVertical="1dp" />
+
+                    <TextView
+                        android:id="@+id/tv_osd_badge_audio"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Dolby 2.0"
+                        android:textColor="#CCCCCC"
+                        android:textSize="10sp"
+                        android:background="@drawable/bg_badge"
+                        android:paddingHorizontal="4dp"
+                        android:paddingVertical="1dp"
+                        android:layout_marginStart="4dp" />
+
+                    <TextView
+                        android:id="@+id/tv_osd_badge_aspect"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="16:9"
+                        android:textColor="#CCCCCC"
+                        android:textSize="10sp"
+                        android:background="@drawable/bg_badge"
+                        android:paddingHorizontal="4dp"
+                        android:paddingVertical="1dp"
+                        android:layout_marginStart="4dp" />
+
+                    <TextView
+                        android:id="@+id/tv_osd_tech_specs"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="1920x1080 | MPV | 线路 1/1 | IPV4 | MPEG4 &amp; AAC"
+                        android:textColor="#CCCCCC"
+                        android:textSize="12sp"
+                        android:layout_marginStart="8dp" />
+
+                </LinearLayout>
+
+                <!-- Row 2: Current EPG Program -->
+                <LinearLayout
+                    android:id="@+id/osd_row_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_below="@id/osd_row_1"
+                    android:layout_marginTop="6dp">
+
+                    <TextView
+                        android:id="@+id/tv_osd_epg_current"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="18:00 ~ 19:00 ????"
+                        android:textColor="#FFFFFF"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:singleLine="true" />
+
+                    <!-- Progress Bar + Timings moved below program name -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="4dp">
+
+                        <ProgressBar
+                            android:id="@+id/pb_osd_epg"
+                            style="?android:attr/progressBarStyleHorizontal"
+                            android:layout_width="150dp"
+                            android:layout_height="6dp"
+                            android:max="100"
+                            android:progress="50"
+                            android:progressDrawable="@drawable/osd_progress_bar"
+                            android:layout_marginEnd="12dp" />
+
+                        <TextView
+                            android:id="@+id/tv_osd_epg_elapsed"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="+30 分钟"
+                            android:textColor="#FF00D2FF"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_osd_epg_remaining"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="30 分钟"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp"
+                            android:layout_marginStart="6dp" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- Row 3: Next EPG Program -->
+                <LinearLayout
+                    android:id="@+id/osd_row_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_below="@id/osd_row_2"
+                    android:layout_marginTop="6dp">
+
+                    <TextView
+                        android:id="@+id/tv_osd_epg_next"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="19:00 ~ 20:00 ????"
+                        android:textColor="#88FFFFFF"
+                        android:textSize="13sp"
+                        android:singleLine="true" />
+
+                </LinearLayout>
+
+                <!-- Row 4: Tech Specs & Codecs -->
+                <RelativeLayout
+                    android:id="@+id/osd_row_4"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentBottom="true"
+                    android:layout_marginBottom="4dp">
+
+                    <!-- Left: Playback URL -->
+                    <TextView
+                        android:id="@+id/tv_osd_play_url"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="http://example.com/playlist.m3u8"
+                        android:textColor="#00FF00"
+                        android:textSize="12sp"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:singleLine="true"
+                        android:ellipsize="marquee"
+                        android:marqueeRepeatLimit="marquee_forever"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:scrollHorizontally="true" />
+
+                </RelativeLayout>
+
+            </RelativeLayout>
+
+            <!-- Right Curved Panel -->
+            <RelativeLayout
+                android:id="@+id/osd_right_panel"
+                android:layout_width="160dp"
+                android:layout_height="match_parent"
+                android:layout_alignParentEnd="true"
+                android:background="@drawable/bg_osd_right"
+                android:paddingStart="40dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:paddingEnd="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:gravity="center_vertical">
+
+                    <!-- Time (Clock) -->
+                    <TextView
+                        android:id="@+id/tv_osd_clock"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="18:58:32"
+                        android:textColor="#FF00D2FF"
+                        android:textSize="24sp"
+                        android:textStyle="bold" />
+
+                    <!-- Date & Weekday -->
+                    <TextView
+                        android:id="@+id/tv_osd_date_week"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="2026-06-28 ???"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <!-- Location -->
+                    <TextView
+                        android:id="@+id/tv_osd_location"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="地区"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <!-- Weather Info -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginTop="6dp">
+
+                        <!-- Today Weather -->
+                        <TextView
+                            android:id="@+id/tv_osd_weather_today"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                        android:text="Today: --"
+                            android:textColor="#CCCCCC"
+                            android:textSize="10sp" />
+
+                        <!-- Tomorrow Weather -->
+                        <TextView
+                            android:id="@+id/tv_osd_weather_tomorrow"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                        android:text="Tomorrow: --"
+                            android:textColor="#88FFFFFF"
+                            android:textSize="10sp" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </RelativeLayout>
+
+        </RelativeLayout>
+
+    </FrameLayout>
+
+    <!-- Top Layer: Settings Overlay -->
+    <include layout="@layout/layout_settings_minimal" />
+
+</FrameLayout>
+

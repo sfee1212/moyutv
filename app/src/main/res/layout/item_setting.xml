@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tv_setting_name"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:paddingVertical="12dp"
+    android:paddingHorizontal="16dp"
+    android:textSize="18sp"
+    android:textStyle="bold"
+    android:textColor="@color/color_text_category_selector"
+    android:background="@drawable/item_focus_bg"
+    android:layout_margin="4dp"/>

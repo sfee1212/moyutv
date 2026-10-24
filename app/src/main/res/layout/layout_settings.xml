@@ -1,0 +1,84 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/settings_overlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_menu_panel"
+    android:visibility="gone"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:padding="32dp">
+
+        <!-- Left Navigation -->
+        <com.iptv.tvplayer.ui.CustomRecyclerView
+            android:id="@+id/rv_settings_nav"
+            android:layout_width="250dp"
+            android:layout_height="match_parent"
+            android:scrollbars="none"
+            android:clipToPadding="false"
+            android:descendantFocusability="afterDescendants" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="#33FFFFFF"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="32dp" />
+
+        <!-- Right Content Area -->
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
+
+            <!-- List Content (Subscriptions/EPG/Decoder) -->
+            <com.iptv.tvplayer.ui.CustomRecyclerView
+                android:id="@+id/rv_settings_content"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scrollbars="none"
+                android:clipToPadding="false"
+                android:descendantFocusability="afterDescendants" />
+
+            <!-- QR Code Content -->
+            <LinearLayout
+                android:id="@+id/layout_qr_code"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="扫码或访问下方地址推送本地源"
+                    android:textColor="#FFFFFF"
+                    android:textSize="24sp"
+                    android:layout_marginBottom="16dp"/>
+
+                <ImageView
+                    android:id="@+id/iv_qr_code"
+                    android:layout_width="300dp"
+                    android:layout_height="300dp"
+                    android:background="#FFFFFF"
+                    android:padding="8dp"/>
+
+                <TextView
+                    android:id="@+id/tv_local_ip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#AAAAAA"
+                    android:textSize="20sp"
+                    android:layout_marginTop="16dp"/>
+            </LinearLayout>
+
+        </FrameLayout>
+    </LinearLayout>
+</FrameLayout>
+

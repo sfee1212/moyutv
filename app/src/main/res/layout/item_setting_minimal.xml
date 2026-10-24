@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:paddingVertical="12dp"
+    android:paddingHorizontal="16dp"
+    android:background="@drawable/item_focus_bg"
+    android:gravity="center_vertical"
+    android:layout_marginVertical="2dp">
+
+    <TextView
+        android:id="@+id/tv_setting_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="18sp"
+        android:textColor="@color/color_text_selector"
+        android:duplicateParentState="true" />
+
+    <TextView
+        android:id="@+id/tv_setting_tag"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="10sp"
+        android:textColor="#E6FFFFFF"
+        android:background="@drawable/bg_tag_grey"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="2dp"
+        android:layout_marginStart="12dp"
+        android:duplicateParentState="true" />
+
+    <!-- Spacer to push right icons to the edge -->
+    <View
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1" />
+
+    <!-- Checkmark for selected options -->
+    <TextView
+        android:id="@+id/iv_setting_check"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="✔"
+        android:textColor="#0099FF"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_marginEnd="8dp"
+        android:visibility="gone" />
+
+    <!-- Arrow for sub-menus -->
+    <TextView
+        android:id="@+id/iv_setting_arrow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=">"
+        android:textColor="#80FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginStart="8dp"
+        android:visibility="gone" />
+
+</LinearLayout>
