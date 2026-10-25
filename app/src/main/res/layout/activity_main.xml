@@ -593,7 +593,7 @@
                     android:marqueeRepeatLimit="marquee_forever"
                     android:singleLine="true"
                     android:scrollHorizontally="true"
-                    android:text="播放地址: --"
+                    android:text="--"
                     android:textColor="#B9E9F7"
                     android:textSize="12sp" />
             </FrameLayout>
