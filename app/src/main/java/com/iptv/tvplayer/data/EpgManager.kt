@@ -122,23 +122,26 @@ object EpgManager {
         for (tryUrl in urlsToTry) {
             if (downloaded) break
             Log.d(TAG, "Trying EPG URL: $tryUrl")
+            var connection: HttpURLConnection? = null
             try {
                 var url = URL(tryUrl)
-                var connection = openTrustAllConnection(url)
+                connection = openTrustAllConnection(url)
                 var redirectCount = 0
                 while (true) {
-                    connection.connectTimeout = 15000
-                    connection.readTimeout = 90000
-                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Android)")
-                    connection.instanceFollowRedirects = false
-                    val status = connection.responseCode
+                    val conn = connection ?: break
+                    conn.connectTimeout = 15000
+                    conn.readTimeout = 90000
+                    conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android)")
+                    conn.instanceFollowRedirects = false
+                    val status = conn.responseCode
                     Log.d(TAG, "HTTP status: $status for $url")
                     if (status == HttpURLConnection.HTTP_MOVED_TEMP || status == HttpURLConnection.HTTP_MOVED_PERM ||
                         status == HttpURLConnection.HTTP_SEE_OTHER || status == 307 || status == 308) {
-                        val newUrl = connection.getHeaderField("Location")
+                        val newUrl = conn.getHeaderField("Location")
                         Log.d(TAG, "Redirect to: $newUrl")
                         if (newUrl == null || redirectCount > 5) break
                         url = URL(url, newUrl)
+                        try { conn.disconnect() } catch (_: Throwable) {}
                         connection = openTrustAllConnection(url)
                         redirectCount++
                     } else {
@@ -146,7 +149,8 @@ object EpgManager {
                     }
                 }
 
-                val finalStatus = connection.responseCode
+                val conn = connection ?: continue
+                val finalStatus = conn.responseCode
                 if (finalStatus != HttpURLConnection.HTTP_OK) {
                     Log.e(TAG, "EPG download failed with HTTP $finalStatus for $tryUrl, trying next...")
                     continue
@@ -154,8 +158,8 @@ object EpgManager {
 
                 // Detect gzip: check Content-Encoding, URL suffix, or magic bytes (0x1F 0x8B)
                 // Some servers (e.g. epg.cdn.loc.cc) send gzip without Content-Encoding header
-                val rawStream = connection.inputStream.buffered()
-                val encoding = connection.getHeaderField("Content-Encoding")
+                val rawStream = conn.inputStream.buffered()
+                val encoding = conn.getHeaderField("Content-Encoding")
                 rawStream.mark(4)
                 val magic = ByteArray(4).also { rawStream.read(it) }
                 rawStream.reset()
@@ -190,6 +194,8 @@ object EpgManager {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "EPG download error for $tryUrl: ${e.javaClass.name}: ${e.message}")
+            } finally {
+                try { connection?.disconnect() } catch (_: Throwable) {}
             }
         }
         if (!downloaded) {

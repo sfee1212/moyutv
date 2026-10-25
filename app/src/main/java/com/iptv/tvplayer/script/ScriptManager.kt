@@ -147,7 +147,12 @@ object ScriptManager {
             if (path.isEmpty()) return null
 
             if (url.startsWith("file://", ignoreCase = true)) {
-                return File(path)
+                val decoded = try {
+                    android.net.Uri.parse(url).path
+                } catch (_: Throwable) {
+                    null
+                }
+                return File(decoded ?: path)
             }
 
             // 拒绝目录穿越
