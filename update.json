@@ -1,6 +1,6 @@
 {
-  "versionCode": 127,
-  "versionName": "1.2.7",
-  "updateUrl": "https://gh-proxy.com/https://github.com/sfee1212/moyutv/releases/download/v1.2.7/moyu_v1.2.7.apk",
-  "updateInfo": "1.脚本兼容性性能提升。\n2.全面支持本地脚本播放PHP、Python、JS，无需远程服务器。所有脚本 php、py、js 全部存放在**对应的本地目录内**，不需要部署远程服务器，通过 local:// 本地协议调用脚本，附带参数就能完成播放。只需要按规范填写名称 + 地址，修改参数就能切换不同源。 "
+  "versionCode": 128,
+  "versionName": "1.2.8",
+  "updateUrl": "https://gh-proxy.com/https://github.com/sfee1212/moyutv/releases/download/v1.2.8/moyu_v1.2.8.apk",
+  "updateInfo": "1.UI风格优化。\n2.兼容性提升 。\n3.应用已经完全开源，可以去项目主页获取源码自行编译。 "
 }
