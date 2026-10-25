@@ -369,7 +369,7 @@
                     android:paddingStart="30dp"
                     android:paddingTop="22dp"
                     android:paddingEnd="28dp"
-                    android:paddingBottom="8dp">
+                    android:paddingBottom="30dp">
 
                     <!-- 左区：频道名 / 技参数 / 正在播放 / 接下来 / 描述 / 进度 -->
                     <LinearLayout
@@ -483,20 +483,6 @@
                             android:progress="0"
                             android:progressDrawable="@drawable/osd_progress_bar" />
 
-                        <!-- 当前播放地址（底部单行滚动显示） -->
-                        <TextView
-                            android:id="@+id/tv_osd_play_url"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="5dp"
-                            android:ellipsize="marquee"
-                            android:marqueeRepeatLimit="marquee_forever"
-                            android:singleLine="true"
-                            android:scrollHorizontally="true"
-                            android:text="播放地址: --"
-                            android:textColor="#7FC7DB"
-                            android:textSize="11sp" />
-
                         <!-- 兼容旧逻辑的隐藏控件（新版界面不展示） -->
                         <LinearLayout
                             android:layout_width="0dp"
@@ -593,6 +579,23 @@
                             android:textSize="11sp" />
                     </LinearLayout>
                 </LinearLayout>
+
+                <!-- 当前播放地址：贴在 OSD 栏最底部，单行滚动显示 -->
+                <TextView
+                    android:id="@+id/tv_osd_play_url"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom"
+                    android:layout_marginStart="30dp"
+                    android:layout_marginEnd="28dp"
+                    android:layout_marginBottom="8dp"
+                    android:ellipsize="marquee"
+                    android:marqueeRepeatLimit="marquee_forever"
+                    android:singleLine="true"
+                    android:scrollHorizontally="true"
+                    android:text="播放地址: --"
+                    android:textColor="#B9E9F7"
+                    android:textSize="12sp" />
             </FrameLayout>
         </FrameLayout>
 
