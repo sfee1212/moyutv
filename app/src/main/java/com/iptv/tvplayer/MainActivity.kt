@@ -434,7 +434,9 @@ class MainActivity : ComponentActivity() {
         val netType = if (currentUrl.contains("ipv6", ignoreCase = true)) "IPV6" else "IPV4"
         val resText = if (resVal.isNotBlank()) resVal else "1920x1080"
         tvOsdTechSpecs.text = "$line · $resText · ${audioCnLabel()} · $netType | 剩余播放: ${formatRemainingTime(remainingMs)}"
-        tvOsdPlayUrl.text = currentUrl
+        val displayUrl = currentUrl.substringBefore("#headers#").trim()
+        tvOsdPlayUrl.text = if (displayUrl.isEmpty()) "播放地址: --" else "播放地址: $displayUrl"
+        tvOsdPlayUrl.isSelected = true
 
         // 节目简介（EPG 暂无简介数据）
         tvOsdDesc.text = "暂无描述信息"

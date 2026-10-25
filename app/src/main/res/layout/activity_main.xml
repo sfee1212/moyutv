@@ -483,6 +483,20 @@
                             android:progress="0"
                             android:progressDrawable="@drawable/osd_progress_bar" />
 
+                        <!-- 当前播放地址（底部单行滚动显示） -->
+                        <TextView
+                            android:id="@+id/tv_osd_play_url"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="5dp"
+                            android:ellipsize="marquee"
+                            android:marqueeRepeatLimit="marquee_forever"
+                            android:singleLine="true"
+                            android:scrollHorizontally="true"
+                            android:text="播放地址: --"
+                            android:textColor="#7FC7DB"
+                            android:textSize="11sp" />
+
                         <!-- 兼容旧逻辑的隐藏控件（新版界面不展示） -->
                         <LinearLayout
                             android:layout_width="0dp"
@@ -518,12 +532,6 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="0 分钟" />
-
-                            <TextView
-                                android:id="@+id/tv_osd_play_url"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="" />
 
                             <TextView
                                 android:id="@+id/tv_osd_location"
