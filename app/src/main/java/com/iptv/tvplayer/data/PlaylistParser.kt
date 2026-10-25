@@ -1,15 +1,23 @@
 package com.iptv.tvplayer.data
 
+import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import org.json.JSONObject
+import java.io.BufferedInputStream
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLDecoder
+import java.net.URLEncoder
+import java.nio.ByteBuffer
+import java.nio.charset.Charset
+import java.nio.charset.CodingErrorAction
+import java.util.Locale
+import java.util.zip.GZIPInputStream
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import android.util.Base64
 
 object AESCrypt {
     // Obfuscated keys using XOR mask 0x5A
@@ -36,17 +44,88 @@ object AESCrypt {
     }
 }
 
+/**
+ * 播放列表解析 (TXT / M3U)。
+ *
+ * 兼容性处理:
+ *  - UTF-8 BOM / GB18030 / GBK / BIG5 编码
+ *  - gzip 压缩的远程列表
+ *  - `url#headers#{...}` 请求头 (JSON, 含逗号/冒号不再解析失败)
+ *  - M3U: group-title / tvg-logo / catchup / catchup-source / catchup-days /
+ *         timeshift / #EXTGRP / KODIPROP
+ *  - TXT: 分类名,#genre#、`频道,url1#url2` 多线路、KODIPROP 跨行
+ *  - 大列表使用索引合并, 避免 O(n²) 查找
+ */
 object PlaylistParser {
+    @Volatile
     var lastError = ""
 
+    private val urlSchemeRegex = Regex(
+        "^(?:https?|rtsp|rtmps|rtmp|rtp|udp|file|local|content|ftp|mms)://",
+        RegexOption.IGNORE_CASE
+    )
+
     private fun decodeBytes(bytes: ByteArray): String {
-        return try {
+        if (bytes.isEmpty()) return ""
+        var offset = 0
+        if (bytes.size >= 3 &&
+            bytes[0] == 0xEF.toByte() && bytes[1] == 0xBB.toByte() && bytes[2] == 0xBF.toByte()
+        ) {
+            offset = 3
+        }
+        val data = if (offset > 0) bytes.copyOfRange(offset, bytes.size) else bytes
+
+        try {
             val decoder = Charsets.UTF_8.newDecoder()
-            decoder.onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
-            decoder.onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
-            decoder.decode(java.nio.ByteBuffer.wrap(bytes)).toString()
-        } catch (e: Exception) {
-            String(bytes, java.nio.charset.Charset.forName("GBK"))
+            decoder.onMalformedInput(CodingErrorAction.REPORT)
+            decoder.onUnmappableCharacter(CodingErrorAction.REPORT)
+            return decoder.decode(ByteBuffer.wrap(data)).toString()
+        } catch (_: Exception) {
+        }
+
+        for (charsetName in arrayOf("GB18030", "GBK", "BIG5")) {
+            try {
+                return String(data, Charset.forName(charsetName))
+            } catch (_: Exception) {
+            }
+        }
+        return String(data, Charsets.UTF_8)
+    }
+
+    private fun parseHeaders(headerJson: String?): Map<String, String> {
+        if (headerJson.isNullOrBlank()) return emptyMap()
+        val text = headerJson.trim()
+        try {
+            val obj = JSONObject(text)
+            val map = mutableMapOf<String, String>()
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                map[k] = obj.optString(k)
+            }
+            return map
+        } catch (_: Throwable) {
+            // 兼容旧格式: k:v,k:v
+            val map = mutableMapOf<String, String>()
+            text.removePrefix("{").removeSuffix("}")
+                .split(",")
+                .forEach { part ->
+                    val kv = part.split(":", limit = 2)
+                    if (kv.size == 2) {
+                        map[kv[0].replace("\"", "").trim()] = kv[1].replace("\"", "").trim()
+                    }
+                }
+            return map
+        }
+    }
+
+    private fun encodeUrl(raw: String): String {
+        return try {
+            java.net.URI(raw).toASCIIString()
+        } catch (_: Throwable) {
+            raw.replace(" ", "%20").replace(Regex("[^\\x00-\\x7F]+")) {
+                URLEncoder.encode(it.value, "UTF-8").replace("+", "%20")
+            }
         }
     }
 
@@ -56,199 +135,346 @@ object PlaylistParser {
             lastError = "URL为空"
             return@withContext null
         }
-        
+
         try {
-            // Support url#headers#{"User-Agent":"Player"} format
-            val parts = urlStr.split("#headers#")
-            val targetUrl = parts[0]
-            val headers = if (parts.size > 1) {
-                // simple json parsing for headers map
-                val headerStr = parts[1].trim().removePrefix("{").removeSuffix("}")
-                headerStr.split(",").mapNotNull {
-                    val kv = it.split(":")
-                    if (kv.size == 2) {
-                        kv[0].replace("\"", "").trim() to kv[1].replace("\"", "").trim()
-                    } else null
-                }.toMap()
-            } else emptyMap()
+            val headerSplit = urlStr.split("#headers#", limit = 2)
+            val targetUrl = headerSplit[0].trim()
+            val headers = parseHeaders(headerSplit.getOrNull(1))
 
-            val lines = if (targetUrl.startsWith("file://") || targetUrl.startsWith("/")) {
-                val filePath = targetUrl.replace("file://", "")
-                val file = java.io.File(filePath)
-                if (file.exists()) {
-                    decodeBytes(file.readBytes()).lines()
-                } else {
-                    lastError = "本地文件不存在: $filePath"
-                    return@withContext null
-                }
-            } else {
-                val resolvedUrl = com.iptv.tvplayer.proxy.ProxyManager.resolveUrl(targetUrl)
-                // Encode non-ASCII characters (e.g., Chinese) in URL
-                val encodedUrl = resolvedUrl.replace(Regex("[^\\x00-\\x7F]+")) {
-                    java.net.URLEncoder.encode(it.value, "UTF-8")
-                }
-                val url = java.net.URL(encodedUrl)
-                val connection = url.openConnection() as java.net.HttpURLConnection
-                
-                if (connection is javax.net.ssl.HttpsURLConnection) {
-                    val trustAll = arrayOf<javax.net.ssl.TrustManager>(object : javax.net.ssl.X509TrustManager {
-                        override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
-                        override fun checkClientTrusted(certs: Array<java.security.cert.X509Certificate>, authType: String) {}
-                        override fun checkServerTrusted(certs: Array<java.security.cert.X509Certificate>, authType: String) {}
-                    })
-                    val sc = javax.net.ssl.SSLContext.getInstance("SSL")
-                    sc.init(null, trustAll, java.security.SecureRandom())
-                    connection.sslSocketFactory = sc.socketFactory
-                    connection.hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
-                }
-                
-                val timeoutMs = com.iptv.tvplayer.data.SettingsManager.timeoutSeconds * 1000
-                connection.connectTimeout = timeoutMs
-                connection.readTimeout = timeoutMs
-                connection.setRequestProperty("User-Agent", com.iptv.tvplayer.data.SettingsManager.userAgent)
-                connection.setRequestProperty("Accept", "*/*")
-                connection.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-                
-                headers.forEach { (k, v) ->
-                    connection.setRequestProperty(k, v)
-                }
-
-                if (connection.responseCode in 200..299) {
-                    val inputStream = connection.inputStream
-                    val bytes = inputStream.readBytes()
-                    decodeBytes(bytes).lines()
-                } else {
-                    lastError = "HTTP错误: ${connection.responseCode} ${connection.responseMessage}"
-                    return@withContext null
-                }
+            if (targetUrl.isEmpty()) {
+                lastError = "URL为空"
+                return@withContext null
             }
+
+            val lines = if (targetUrl.startsWith("file://", ignoreCase = true) ||
+                targetUrl.startsWith("/") ||
+                targetUrl.startsWith("content://", ignoreCase = true)
+            ) {
+                readLocal(targetUrl)
+            } else {
+                readRemote(targetUrl, headers)
+            } ?: return@withContext null
+
             var finalLines = lines
             if (finalLines.isNotEmpty()) {
                 val fullText = finalLines.joinToString("\n").trim()
-                // Simple heuristic to detect plain text playlist
-                val isPlainText = fullText.startsWith("#EXTM3U") || fullText.contains(",#genre#")
-                
+                val isPlainText = fullText.startsWith("#EXTM3U") || fullText.contains(",#genre#") ||
+                    fullText.contains("，#genre#") || fullText.contains("#EXTINF")
                 if (!isPlainText) {
                     val decryptedText = AESCrypt.decrypt(fullText)
-                    if (!decryptedText.isNullOrEmpty() && (decryptedText.startsWith("#EXTM3U") || decryptedText.contains(",#genre#"))) {
+                    if (!decryptedText.isNullOrEmpty() &&
+                        (decryptedText.startsWith("#EXTM3U") || decryptedText.contains(",#genre#") ||
+                            decryptedText.contains("#EXTINF"))
+                    ) {
                         finalLines = decryptedText.lines()
                     }
                 }
             }
-            
+
             return@withContext parseLines(finalLines)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            lastError = "${e.javaClass.simpleName}: ${e.message}"
+        } catch (t: Throwable) {
+            lastError = "${t.javaClass.simpleName}: ${t.message}"
         }
         return@withContext null
     }
 
-    private fun parseLines(lines: List<String>): Playlist {
-        // Detect if M3U or TXT
-        if (lines.any { it.startsWith("#EXTM3U") }) {
-            return parseM3u(lines)
+    private fun readLocal(targetUrl: String): List<String>? {
+        val path = if (targetUrl.startsWith("file://", ignoreCase = true)) {
+            try {
+                java.net.URI(targetUrl).path ?: targetUrl.removePrefix("file://")
+            } catch (_: Throwable) {
+                targetUrl.removePrefix("file://")
+            }
+        } else {
+            targetUrl
         }
-        return parseTxt(lines)
+        val file = File(path)
+        if (!file.isFile) {
+            lastError = "本地文件不存在: $path"
+            return null
+        }
+        return try {
+            decodeBytes(file.readBytes()).lines()
+        } catch (t: Throwable) {
+            lastError = "读取本地文件失败: ${t.message}"
+            null
+        }
+    }
+
+    private fun readRemote(targetUrl: String, headers: Map<String, String>): List<String>? {
+        val resolvedUrl = com.iptv.tvplayer.proxy.ProxyManager.resolveUrl(targetUrl)
+        val encodedUrl = encodeUrl(resolvedUrl)
+        val connection = try {
+            URL(encodedUrl).openConnection() as HttpURLConnection
+        } catch (t: Throwable) {
+            lastError = "URL格式错误: ${t.message}"
+            return null
+        }
+
+        try {
+            if (connection is javax.net.ssl.HttpsURLConnection) {
+                val trustAll = arrayOf<javax.net.ssl.TrustManager>(object : javax.net.ssl.X509TrustManager {
+                    override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+                    override fun checkClientTrusted(certs: Array<java.security.cert.X509Certificate>, authType: String) {}
+                    override fun checkServerTrusted(certs: Array<java.security.cert.X509Certificate>, authType: String) {}
+                })
+                val sc = javax.net.ssl.SSLContext.getInstance("TLS")
+                sc.init(null, trustAll, java.security.SecureRandom())
+                connection.sslSocketFactory = sc.socketFactory
+                connection.hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
+            }
+
+            val timeoutMs = (com.iptv.tvplayer.data.SettingsManager.timeoutSeconds.coerceIn(3, 60)) * 1000
+            connection.connectTimeout = timeoutMs
+            connection.readTimeout = timeoutMs
+            connection.instanceFollowRedirects = true
+            connection.setRequestProperty("User-Agent", com.iptv.tvplayer.data.SettingsManager.userAgent)
+            connection.setRequestProperty("Accept", "*/*")
+            connection.setRequestProperty("Accept-Encoding", "gzip")
+            connection.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+            headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
+
+            if (connection.responseCode !in 200..299) {
+                lastError = "HTTP错误: ${connection.responseCode} ${connection.responseMessage}"
+                return null
+            }
+
+            val bytes = BufferedInputStream(connection.inputStream).use { raw ->
+                raw.mark(4)
+                val magic = ByteArray(4)
+                val read = raw.read(magic)
+                raw.reset()
+                val isGzip = connection.contentEncoding?.lowercase(Locale.US)?.contains("gzip") == true ||
+                    (read >= 2 && magic[0] == 0x1F.toByte() && magic[1] == 0x8B.toByte())
+                if (isGzip) {
+                    GZIPInputStream(raw).use { it.readBytes() }
+                } else {
+                    raw.readBytes()
+                }
+            }
+            return decodeBytes(bytes).lines()
+        } catch (t: Throwable) {
+            lastError = "${t.javaClass.simpleName}: ${t.message}"
+            return null
+        } finally {
+            try {
+                connection.disconnect()
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    private fun parseLines(rawLines: List<String>): Playlist {
+        val lines = rawLines.map { it.removePrefix("\uFEFF") }
+        val isM3u = lines.any {
+            val t = it.trimStart()
+            t.startsWith("#EXTM3U", ignoreCase = true) || t.startsWith("#EXTINF", ignoreCase = true)
+        }
+        return if (isM3u) parseM3u(lines) else parseTxt(lines)
+    }
+
+    private class ChannelAccumulator {
+        val categories = mutableListOf<String>()
+        val channelsMap = LinkedHashMap<String, MutableList<Channel>>()
+        private val categorySet = HashSet<String>()
+        private val index = HashMap<String, HashMap<String, Int>>()
+
+        fun ensureCategory(category: String) {
+            if (categorySet.add(category)) {
+                categories.add(category)
+                channelsMap[category] = mutableListOf()
+            }
+        }
+
+        fun add(
+            category: String,
+            name: String,
+            urls: List<String>,
+            logo: String? = null,
+            drmType: String? = null,
+            drmKey: String? = null,
+            catchup: String? = null,
+            catchupSource: String? = null,
+            catchupDays: Int = 0
+        ) {
+            if (name.isBlank() || urls.isEmpty()) return
+            ensureCategory(category)
+            val list = channelsMap[category] ?: return
+            val idxMap = index.getOrPut(category) { HashMap() }
+            val existingIndex = idxMap[name]
+
+            if (existingIndex != null && existingIndex in list.indices) {
+                val old = list[existingIndex]
+                list[existingIndex] = old.copy(
+                    urls = (old.urls + urls).distinct(),
+                    logo = old.logo ?: logo,
+                    drmType = old.drmType ?: drmType,
+                    drmKey = old.drmKey ?: drmKey,
+                    catchup = old.catchup ?: catchup,
+                    catchupSource = old.catchupSource ?: catchupSource,
+                    catchupDays = if (old.catchupDays > 0) old.catchupDays else catchupDays
+                )
+            } else {
+                idxMap[name] = list.size
+                list.add(
+                    Channel(
+                        name = name,
+                        urls = urls.distinct(),
+                        logo = logo,
+                        drmType = drmType,
+                        drmKey = drmKey,
+                        catchup = catchup,
+                        catchupSource = catchupSource,
+                        catchupDays = catchupDays
+                    )
+                )
+            }
+        }
+
+        fun build(): Playlist = Playlist(categories.toList(), channelsMap)
+    }
+
+    private fun splitUrls(raw: String): List<String> {
+        val value = raw.trim().replace("&amp;", "&")
+        if (value.isEmpty()) return emptyList()
+        if (value.contains("#headers#", ignoreCase = true)) return listOf(value)
+
+        // TVBox 常见写法: 频道,http://a.m3u8#http://b.m3u8
+        if (value.startsWith("http", ignoreCase = true) && value.contains("#")) {
+            val pieces = value.split("#").map { it.trim() }.filter { it.isNotEmpty() }
+            if (pieces.size > 1 && pieces.drop(1).all { urlSchemeRegex.containsMatchIn(it) }) {
+                return pieces
+            }
+        }
+        return listOf(value)
+    }
+
+    private fun addKodiProp(target: MutableMap<String, String>, line: String) {
+        val body = line.removePrefix("#KODIPROP:").removePrefix("#kodiprop:")
+        val parts = body.split("=", limit = 2)
+        if (parts.size == 2) {
+            target[parts[0].trim()] = parts[1].trim()
+        }
     }
 
     private fun parseTxt(lines: List<String>): Playlist {
-        val categories = mutableListOf<String>()
-        val channelsMap = mutableMapOf<String, MutableList<Channel>>()
-        
+        val acc = ChannelAccumulator()
         var currentCategory = "未分类"
         var pendingName: String? = null
         val kodiProps = mutableMapOf<String, String>()
-        
+
         for (line in lines) {
             val text = line.trim()
             if (text.isEmpty()) continue
-            
-            if (text.contains(",#genre#")) {
-                currentCategory = text.split(",")[0].trim()
-                if (!categories.contains(currentCategory)) {
-                    categories.add(currentCategory)
-                    channelsMap[currentCategory] = mutableListOf()
+
+            if (text.startsWith("#")) {
+                if (text.startsWith("#KODIPROP:", ignoreCase = true)) {
+                    addKodiProp(kodiProps, text)
                 }
+                continue
+            }
+
+            val genreIndex = text.indexOf("#genre#", ignoreCase = true)
+            if (genreIndex >= 0) {
+                val name = text.substring(0, genreIndex).trim().trimEnd(',', '，').trim()
+                currentCategory = name.ifBlank { "未分类" }
+                acc.ensureCategory(currentCategory)
                 pendingName = null
                 kodiProps.clear()
                 continue
             }
-            
+
+            // KODIPROP 之后单独一行的 URL
             if (pendingName != null) {
-                if (text.startsWith("#KODIPROP:")) {
-                    val parts = text.removePrefix("#KODIPROP:").split("=", limit = 2)
-                    if (parts.size == 2) {
-                        kodiProps[parts[0].trim()] = parts[1].trim()
-                    }
-                } else if (!text.startsWith("#")) {
+                val comma = text.indexOf(',')
+                // 只有“逗号前不是 URL”才视为新频道; 否则把整行当作上一行的 URL
+                // (URL 查询参数里也可能带逗号)
+                val looksLikeNewChannel = comma > 0 &&
+                    !urlSchemeRegex.containsMatchIn(text.substring(0, comma).trim())
+                if (!looksLikeNewChannel) {
                     val drmType = kodiProps["inputstream.adaptive.license_type"]
                     val drmKey = kodiProps["inputstream.adaptive.license_key"]
-                    
-                    val channelList = channelsMap[currentCategory]!!
-                    val existingChannel = channelList.find { it.name == pendingName }
-                    if (existingChannel != null) {
-                        val mutableUrls = existingChannel.urls.toMutableList()
-                        mutableUrls.add(text)
-                        val index = channelList.indexOf(existingChannel)
-                        channelList[index] = existingChannel.copy(
-                            urls = mutableUrls,
-                            drmType = existingChannel.drmType ?: drmType,
-                            drmKey = existingChannel.drmKey ?: drmKey
-                        )
-                    } else {
-                        channelList.add(Channel(pendingName, listOf(text), null, drmType, drmKey))
-                    }
-                    
+                    acc.add(
+                        currentCategory,
+                        pendingName,
+                        splitUrls(text),
+                        drmType = drmType,
+                        drmKey = drmKey
+                    )
                     pendingName = null
                     kodiProps.clear()
+                    continue
                 }
+                pendingName = null
+                kodiProps.clear()
+            }
+
+            val comma = text.indexOf(',')
+            if (comma <= 0) continue
+            val name = text.substring(0, comma).trim()
+            if (name.isEmpty()) continue
+            val rest = text.substring(comma + 1).trim()
+
+            if (rest.startsWith("#KODIPROP:", ignoreCase = true)) {
+                pendingName = name
+                addKodiProp(kodiProps, rest)
                 continue
             }
-            
-            if (text.startsWith("#")) continue
-            
-            if (text.contains(",")) {
-                val parts = text.split(",", limit = 2)
-                if (parts.size == 2) {
-                    val name = parts[0].trim()
-                    val urlOrProp = parts[1].trim()
-                    
-                    if (!categories.contains(currentCategory)) {
-                        categories.add(currentCategory)
-                        channelsMap[currentCategory] = mutableListOf()
+            if (rest.isEmpty()) {
+                pendingName = name
+                continue
+            }
+
+            val drmType = kodiProps["inputstream.adaptive.license_type"]
+            val drmKey = kodiProps["inputstream.adaptive.license_key"]
+            acc.add(
+                currentCategory,
+                name,
+                splitUrls(rest),
+                drmType = drmType,
+                drmKey = drmKey
+            )
+            kodiProps.clear()
+        }
+
+        return acc.build()
+    }
+
+    private fun attr(text: String, name: String): String? {
+        val regex = Regex(
+            "(?:^|\\s)" + Regex.escape(name) + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s,]+))",
+            RegexOption.IGNORE_CASE
+        )
+        val match = regex.find(text) ?: return null
+        val value = match.groupValues[2].ifEmpty {
+            match.groupValues[3].ifEmpty { match.groupValues[4] }
+        }
+        return value.trim().ifEmpty { null }
+    }
+
+    /** 取 #EXTINF 行中引号外的第一个逗号后的频道名 (频道名本身可含逗号) */
+    private fun extInfName(text: String): String {
+        var inQuote = false
+        var quoteChar = ' '
+        for (i in text.indices) {
+            val c = text[i]
+            if (inQuote) {
+                if (c == quoteChar) inQuote = false
+            } else {
+                when (c) {
+                    '"', '\'' -> {
+                        inQuote = true
+                        quoteChar = c
                     }
-                    
-                    if (urlOrProp.startsWith("#KODIPROP:")) {
-                        pendingName = name
-                        kodiProps.clear()
-                        val propParts = urlOrProp.removePrefix("#KODIPROP:").split("=", limit = 2)
-                        if (propParts.size == 2) {
-                            kodiProps[propParts[0].trim()] = propParts[1].trim()
-                        }
-                    } else {
-                        val channelList = channelsMap[currentCategory]!!
-                        val existingChannel = channelList.find { it.name == name }
-                        if (existingChannel != null) {
-                            val mutableUrls = existingChannel.urls.toMutableList()
-                            mutableUrls.add(urlOrProp)
-                            val index = channelList.indexOf(existingChannel)
-                            channelList[index] = existingChannel.copy(urls = mutableUrls)
-                        } else {
-                            channelList.add(Channel(name, listOf(urlOrProp)))
-                        }
-                    }
+                    ',' -> return text.substring(i + 1).trim()
                 }
             }
         }
-        
-        return Playlist(categories, channelsMap)
+        return ""
     }
 
     private fun parseM3u(lines: List<String>): Playlist {
-        val categories = mutableListOf<String>()
-        val channelsMap = mutableMapOf<String, MutableList<Channel>>()
-        
+        val acc = ChannelAccumulator()
         var currentCategory = "未分类"
         var currentName = ""
         var currentLogo: String? = null
@@ -256,97 +482,69 @@ object PlaylistParser {
         var currentCatchupSource: String? = null
         var currentCatchupDays = 0
         val kodiProps = mutableMapOf<String, String>()
-        
+
         for (line in lines) {
             val text = line.trim()
             if (text.isEmpty()) continue
-            
-            if (text.startsWith("#EXTINF")) {
-                kodiProps.clear()
-                // Parse group-title if exists
-                val groupTitleRegex = "group-title=\"([^\"]+)\"".toRegex()
-                val match = groupTitleRegex.find(text)
-                if (match != null) {
-                    currentCategory = match.groupValues[1]
+
+            when {
+                text.startsWith("#EXTM3U", ignoreCase = true) -> {
+                    // 可含 url-tvg / x-tvg-url, 目前不需要
                 }
-                
-                // Parse tvg-logo or logo if exists
-                val logoRegex = """(?:tvg-logo|logo)="([^"]+)"""".toRegex()
-                val logoMatch = logoRegex.find(text)
-                currentLogo = logoMatch?.groupValues?.get(1)
-                
-                // Parse catchup properties
-                val catchupRegex = """catchup(?:-type)?"="([^"]+)"""".toRegex(RegexOption.IGNORE_CASE)
-                val catchupSourceRegex = """catchup-source="([^"]+)"""".toRegex(RegexOption.IGNORE_CASE)
-                val catchupDaysRegex = """(?:catchup-days|timeshift)="([^"]+)"""".toRegex(RegexOption.IGNORE_CASE)
-                
-                currentCatchup = catchupRegex.find(text)?.groupValues?.get(1)
-                currentCatchupSource = catchupSourceRegex.find(text)?.groupValues?.get(1)
-                currentCatchupDays = catchupDaysRegex.find(text)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-                
-                // Parse channel name (after last comma)
-                val commaIndex = text.lastIndexOf(",")
-                if (commaIndex != -1) {
-                    currentName = text.substring(commaIndex + 1).trim()
+
+                text.startsWith("#EXTINF", ignoreCase = true) -> {
+                    kodiProps.clear()
+                    currentLogo = null
+                    currentCatchup = null
+                    currentCatchupSource = null
+                    currentCatchupDays = 0
+
+                    val group = attr(text, "group-title") ?: attr(text, "group")
+                    if (!group.isNullOrBlank()) currentCategory = group
+
+                    currentLogo = attr(text, "tvg-logo") ?: attr(text, "logo")
+                    currentCatchup = attr(text, "catchup") ?: attr(text, "catchup-type")
+                    currentCatchupSource = attr(text, "catchup-source")
+                    currentCatchupDays = attr(text, "catchup-days")?.toIntOrNull()
+                        ?: attr(text, "timeshift")?.toIntOrNull()
+                        ?: 0
+
+                    currentName = extInfName(text).ifEmpty { attr(text, "tvg-name") ?: "" }
                 }
-            } else if (text.startsWith("#KODIPROP:")) {
-                val parts = text.removePrefix("#KODIPROP:").split("=", limit = 2)
-                if (parts.size == 2) {
-                    kodiProps[parts[0].trim()] = parts[1].trim()
+
+                text.startsWith("#EXTGRP:", ignoreCase = true) -> {
+                    val group = text.substringAfter(':').trim()
+                    if (group.isNotEmpty()) currentCategory = group
                 }
-            } else if (!text.startsWith("#")) {
-                // It's a URL
-                if (currentName.isNotEmpty()) {
-                    if (!categories.contains(currentCategory)) {
-                        categories.add(currentCategory)
-                        channelsMap[currentCategory] = mutableListOf()
-                    }
-                    
-                    val drmType = kodiProps["inputstream.adaptive.license_type"]
-                    val drmKey = kodiProps["inputstream.adaptive.license_key"]
-                    
-                    val channelList = channelsMap[currentCategory]!!
-                    val existingChannel = channelList.find { it.name == currentName }
-                    if (existingChannel != null) {
-                        val mutableUrls = existingChannel.urls.toMutableList()
-                        mutableUrls.add(text)
-                        val index = channelList.indexOf(existingChannel)
-                        val finalLogo = existingChannel.logo ?: currentLogo
-                        val finalDrmType = existingChannel.drmType ?: drmType
-                        val finalDrmKey = existingChannel.drmKey ?: drmKey
-                        val finalCatchup = existingChannel.catchup ?: currentCatchup
-                        val finalCatchupSource = existingChannel.catchupSource ?: currentCatchupSource
-                        val finalCatchupDays = if (existingChannel.catchupDays > 0) existingChannel.catchupDays else currentCatchupDays
-                        channelList[index] = existingChannel.copy(
-                            urls = mutableUrls,
-                            logo = finalLogo,
-                            drmType = finalDrmType,
-                            drmKey = finalDrmKey,
-                            catchup = finalCatchup,
-                            catchupSource = finalCatchupSource,
-                            catchupDays = finalCatchupDays
-                        )
-                    } else {
-                        channelList.add(Channel(
-                            name = currentName, 
-                            urls = listOf(text), 
-                            logo = currentLogo, 
-                            drmType = drmType, 
+
+                text.startsWith("#KODIPROP:", ignoreCase = true) -> {
+                    addKodiProp(kodiProps, text)
+                }
+
+                text.startsWith("#") -> {
+                    // #EXTVLCOPT / #EXT-X-... 等忽略
+                }
+
+                else -> {
+                    if (currentName.isNotEmpty()) {
+                        val drmType = kodiProps["inputstream.adaptive.license_type"]
+                        val drmKey = kodiProps["inputstream.adaptive.license_key"]
+                        acc.add(
+                            currentCategory,
+                            currentName,
+                            splitUrls(text),
+                            logo = currentLogo,
+                            drmType = drmType,
                             drmKey = drmKey,
                             catchup = currentCatchup,
                             catchupSource = currentCatchupSource,
                             catchupDays = currentCatchupDays
-                        ))
+                        )
                     }
                 }
-                currentLogo = null // reset for next channel
-                currentCatchup = null
-                currentCatchupSource = null
-                currentCatchupDays = 0
-                kodiProps.clear()
             }
         }
-        
-        return Playlist(categories, channelsMap)
+
+        return acc.build()
     }
 }

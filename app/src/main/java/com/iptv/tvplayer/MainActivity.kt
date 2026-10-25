@@ -60,6 +60,10 @@ class MainActivity : ComponentActivity() {
     private var playJob: kotlinx.coroutines.Job? = null
     private lateinit var gestureDetector: GestureDetector
 
+    /** 防止 getResources() 里 updateConfiguration 触发递归 */
+    @Volatile
+    private var adjustingDensity = false
+
     private val localFilePickerLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: android.net.Uri? ->
@@ -97,10 +101,25 @@ class MainActivity : ComponentActivity() {
     private lateinit var tvOsdBadgeAudio: android.widget.TextView
     private lateinit var tvOsdBadgeAspect: android.widget.TextView
     private lateinit var tvOsdBadgeCatchup: android.widget.TextView
-    
+    private lateinit var tvOsdLunar: android.widget.TextView
+    private lateinit var tvOsdDesc: android.widget.TextView
+    private lateinit var tvOsdTopWeather: android.widget.TextView
+    private lateinit var tvOsdTopChannel: android.widget.TextView
+    private lateinit var tvOsdTopBadge: android.widget.TextView
+    private lateinit var tvOsdVerticalTitle: android.widget.TextView
+
     @Volatile private var weatherCity = ""
-    @Volatile private var weatherToday = ""
-    @Volatile private var weatherTomorrow = ""
+    @Volatile private var weatherCurrentTemp = ""
+    @Volatile private var weatherCurrentDesc = ""
+    @Volatile private var weatherTodayMax = ""
+    @Volatile private var weatherTodayMin = ""
+    @Volatile private var weatherTodayDesc = ""
+    @Volatile private var weatherTomorrowMax = ""
+    @Volatile private var weatherTomorrowMin = ""
+    @Volatile private var weatherTomorrowDesc = ""
+    @Volatile private var weatherWindDir = ""
+    @Volatile private var weatherWindLevel = -1
+    @Volatile private var weatherTomorrowWindLevel = -1
     private val hideOsdRunnable = Runnable { bottomOsdBar.visibility = View.GONE }
 
     private lateinit var categoryAdapter: com.iptv.tvplayer.ui.CategoryAdapter
@@ -141,22 +160,45 @@ class MainActivity : ComponentActivity() {
 
     override fun getResources(): android.content.res.Resources {
         val res = super.getResources()
-        val metrics = res.displayMetrics
-        val config = res.configuration
-        
-        // Android TV adaptation: Force scale to match 540p base resolution (standard TV density).
-        // This makes everything (fonts, UI) 33% larger than a 720p base.
-        val h = Math.min(metrics.widthPixels, metrics.heightPixels).toFloat()
-        if (h > 0) {
+        if (adjustingDensity) return res
+        try {
+            adjustingDensity = true
+            val metrics = res.displayMetrics
+            val config = res.configuration
+
+            // Android TV adaptation: Force scale to match 540p base resolution (standard TV density).
+            // This makes everything (fonts, UI) 33% larger than a 720p base.
+            val h = Math.min(metrics.widthPixels, metrics.heightPixels).toFloat()
+            if (h <= 0f) return res
+
             val targetDensity = h / 540f
-            if (metrics.density != targetDensity || metrics.scaledDensity != targetDensity) {
-                config.densityDpi = (targetDensity * 160).toInt()
-                metrics.density = targetDensity
-                metrics.scaledDensity = targetDensity
-                // Ignore deprecation warning, updateConfiguration is reliable on older TV OS
-                @Suppress("DEPRECATION")
-                res.updateConfiguration(config, metrics)
+            if (!targetDensity.isFinite() || targetDensity <= 0f) return res
+
+            if (Math.abs(metrics.density - targetDensity) < 0.01f &&
+                Math.abs(metrics.scaledDensity - targetDensity) < 0.01f
+            ) {
+                return res
             }
+
+            val fontScale = if (config.fontScale > 0f) config.fontScale else 1f
+            config.densityDpi = (targetDensity * 160f).toInt()
+            // 同步 dp 尺寸, 避免 values-sw600dp 等限定符与 density 不一致
+            config.screenWidthDp = (metrics.widthPixels / targetDensity).toInt()
+            config.screenHeightDp = (metrics.heightPixels / targetDensity).toInt()
+            config.smallestScreenWidthDp = (h / targetDensity).toInt()
+
+            metrics.density = targetDensity
+            metrics.densityDpi = config.densityDpi
+            // 尊重系统字体缩放
+            metrics.scaledDensity = targetDensity * fontScale
+
+            // Ignore deprecation warning, updateConfiguration is reliable on older TV OS
+            @Suppress("DEPRECATION")
+            res.updateConfiguration(config, metrics)
+        } catch (t: Throwable) {
+            android.util.Log.w("MainActivity", "density adaptation failed: ${t.message}")
+        } finally {
+            adjustingDensity = false
         }
         return res
     }
@@ -237,35 +279,18 @@ class MainActivity : ComponentActivity() {
         tvOsdBadgeAudio = findViewById(R.id.tv_osd_badge_audio)
         tvOsdBadgeAspect = findViewById(R.id.tv_osd_badge_aspect)
         tvOsdBadgeCatchup = findViewById(R.id.tv_osd_badge_catchup)
+        tvOsdLunar = findViewById(R.id.tv_osd_lunar)
+        tvOsdDesc = findViewById(R.id.tv_osd_desc)
+        tvOsdTopWeather = findViewById(R.id.tv_osd_top_weather)
+        tvOsdTopChannel = findViewById(R.id.tv_osd_top_channel)
+        tvOsdTopBadge = findViewById(R.id.tv_osd_top_badge)
+        tvOsdVerticalTitle = findViewById(R.id.tv_osd_vertical_title)
 
         // Start 1-second OSD clock updates
         lifecycleScope.launch(Dispatchers.Main) {
-            val timeFormat = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.CHINESE)
-            val dateFormat = java.text.SimpleDateFormat("MM月dd日", java.util.Locale.CHINESE)
-            val dayFormat = java.text.SimpleDateFormat("EEEE", java.util.Locale.CHINESE)
-            
             while (isActive) {
                 if (bottomOsdBar.visibility == View.VISIBLE) {
-                    val now = java.util.Date()
-                    tvOsdClock.text = timeFormat.format(now)
-                    tvOsdDateWeek.text = "${dateFormat.format(now)} ${dayFormat.format(now)}"
-                    
-                    // Hide Location
-                    tvOsdLocation.visibility = View.GONE
-                    
-                    if (weatherToday.isNotEmpty()) {
-                        tvOsdWeatherToday.text = weatherToday
-                        tvOsdWeatherToday.visibility = View.VISIBLE
-                    } else {
-                        tvOsdWeatherToday.visibility = View.GONE
-                    }
-                    
-                    if (weatherTomorrow.isNotEmpty()) {
-                        tvOsdWeatherTomorrow.text = weatherTomorrow
-                        tvOsdWeatherTomorrow.visibility = View.VISIBLE
-                    } else {
-                        tvOsdWeatherTomorrow.visibility = View.GONE
-                    }
+                    refreshOsdClock()
                 }
                 delay(1000)
             }
@@ -334,137 +359,240 @@ class MainActivity : ComponentActivity() {
         val cat = categories.getOrNull(playingCategoryIndex) ?: ""
         val chList = channelsMap[cat] ?: emptyList()
         val channel = chList.getOrNull(playingChannelIndex) ?: return
-        
+
         val globalNum = getGlobalChannelNumber(playingCategoryIndex, playingChannelIndex)
         val chNum = String.format(java.util.Locale.US, "%04d", globalNum)
-        tvOsdChannelName.text = "$chNum. ${channel.name}"
-        
+
+        // 右上角频道号 + 底栏频道名
+        tvOsdTopChannel.text = chNum
+        tvOsdChannelName.text = channel.name
         tvOsdBadgeCatchup.visibility = if (supportsCatchup(channel)) View.VISIBLE else View.GONE
-        
-        val catchupProg = playingCatchupProgram
-        if (catchupProg != null) {
-            tvOsdEpgCurrent.text = "[回看] ${catchupProg.startTimeStr} ~ ${catchupProg.endTimeStr}  ${catchupProg.title}"
-            tvOsdEpgElapsed.visibility = View.GONE
-            tvOsdEpgRemaining.visibility = View.GONE
-            pbOsdEpg.visibility = View.GONE
-            tvOsdEpgNext.text = "稍后: (回看)"
-        } else {
-            val (curProgram, nextProgram) = com.iptv.tvplayer.data.EpgManager.getCurrentAndNextProgram(channel.name)
-            if (curProgram != null) {
-                tvOsdEpgCurrent.text = "${curProgram.startTimeStr} ~ ${curProgram.endTimeStr}  ${curProgram.title}"
-                val now = System.currentTimeMillis()
-                val total = curProgram.endMillis - curProgram.startMillis
-                val progress = if (total > 0) {
-                    ((now - curProgram.startMillis).toFloat() / total.toFloat() * 100).toInt().coerceIn(0, 100)
-                } else 0
-                pbOsdEpg.progress = progress
-                val elapsed = ((now - curProgram.startMillis) / 60000).coerceAtLeast(0)
-                val remaining = ((curProgram.endMillis - now) / 60000).coerceAtLeast(0)
-                tvOsdEpgElapsed.text = "+$elapsed 分钟"
-                tvOsdEpgRemaining.text = "$remaining 分钟"
-                tvOsdEpgElapsed.visibility = View.VISIBLE
-                tvOsdEpgRemaining.visibility = View.VISIBLE
-                pbOsdEpg.visibility = View.VISIBLE
-            } else {
-                tvOsdEpgCurrent.text = "精彩节目"
-                tvOsdEpgElapsed.visibility = View.GONE
-                tvOsdEpgRemaining.visibility = View.GONE
-                pbOsdEpg.visibility = View.GONE
-            }
-            
-            if (nextProgram != null) {
-                tvOsdEpgNext.text = "稍后: ${nextProgram.startTimeStr} ~ ${nextProgram.endTimeStr}  ${nextProgram.title}"
-            } else {
-                tvOsdEpgNext.text = "稍后: 精彩节目"
-            }
-        }
-        
+
+        // 分辨率 / 画质标签
         val resVal = com.iptv.tvplayer.player.PlayerStateManager.videoResolution.value
-        var resolutionTag = "HD"
         var width = 0
         var height = 0
+        val resolutionTag: String
         if (resVal.isNotBlank() && resVal.contains("x")) {
             try {
                 val parts = resVal.split("x")
                 width = parts[0].toInt()
                 height = parts[1].toInt()
-                resolutionTag = when {
-                    width >= 3840 || height >= 2160 -> "4K"
-                    width >= 1920 || height >= 1080 -> "HD"
-                    else -> "SD"
-                }
             } catch (e: Exception) {}
-        } else {
-            val isHd = channel.name.contains("HD", ignoreCase = true) || channel.name.contains("高清", ignoreCase = true)
-            val is4k = channel.name.contains("4K", ignoreCase = true) || channel.name.contains("超清", ignoreCase = true)
-            resolutionTag = if (is4k) "4K" else if (isHd) "HD" else "SD"
         }
+        resolutionTag = when {
+            width >= 3840 || height >= 2160 -> "4K"
+            width >= 1920 || height >= 1080 -> "高清"
+            channel.name.contains("4K", ignoreCase = true) || channel.name.contains("超清", ignoreCase = true) -> "4K"
+            channel.name.contains("HD", ignoreCase = true) || channel.name.contains("高清", ignoreCase = true) -> "高清"
+            else -> "标清"
+        }
+        tvOsdTopBadge.text = resolutionTag
         tvOsdBadgeRes.text = resolutionTag
-        
-        val audioTag = com.iptv.tvplayer.player.PlayerStateManager.audioLabel
-        tvOsdBadgeAudio.text = audioTag
+        tvOsdBadgeAudio.text = com.iptv.tvplayer.player.PlayerStateManager.audioLabel
+        tvOsdBadgeAspect.text = "16:9"
 
-        
-        var aspectTag = "16:9"
-        if (width > 0 && height > 0) {
-            val ratio = width.toFloat() / height.toFloat()
-            aspectTag = when {
-                kotlin.math.abs(ratio - 16f/9f) < 0.1f -> "16:9"
-                kotlin.math.abs(ratio - 4f/3f) < 0.1f -> "4:3"
-                kotlin.math.abs(ratio - 21f/9f) < 0.15f -> "21:9"
-                else -> String.format(java.util.Locale.US, "%.1f:1", ratio)
+        // 当前 / 下一档节目
+        val catchupProg = playingCatchupProgram
+        val activeProgram: com.iptv.tvplayer.data.EpgProgram?
+        if (catchupProg != null) {
+            activeProgram = catchupProg
+            tvOsdEpgCurrent.text = "正在播放: [回看] ${catchupProg.startTimeStr} - ${catchupProg.endTimeStr} | ${catchupProg.title}"
+            tvOsdEpgNext.text = "接下来: --"
+        } else {
+            val (curProgram, nextProgram) = com.iptv.tvplayer.data.EpgManager.getCurrentAndNextProgram(channel.name)
+            activeProgram = curProgram
+            tvOsdEpgCurrent.text = if (curProgram != null) {
+                "正在播放: ${curProgram.startTimeStr} - ${curProgram.endTimeStr} | ${curProgram.title}"
+            } else {
+                "正在播放: --"
+            }
+            tvOsdEpgNext.text = if (nextProgram != null) {
+                "接下来: ${nextProgram.startTimeStr} - ${nextProgram.endTimeStr} ${nextProgram.title}"
+            } else {
+                "接下来: --"
+            }
+            if (curProgram != null) {
+                val now = System.currentTimeMillis()
+                val total = curProgram.endMillis - curProgram.startMillis
+                pbOsdEpg.progress = if (total > 0) {
+                    (((now - curProgram.startMillis).toFloat() / total.toFloat()) * 100).toInt().coerceIn(0, 100)
+                } else 0
+            } else {
+                pbOsdEpg.progress = 0
             }
         }
-        tvOsdBadgeAspect.text = aspectTag
+        pbOsdEpg.visibility = if (activeProgram != null) View.VISIBLE else View.GONE
+        tvOsdEpgElapsed.visibility = View.GONE
+        tvOsdEpgRemaining.visibility = View.GONE
 
-        val res = if (resVal.isNotBlank()) resVal else "1920x1080"
-        val dec = com.iptv.tvplayer.data.SettingsManager.decoderTypeState.value
+        // 技参数行：线路 · 分辨率 · 音频 · 网络 | 剩余播放
+        val remainingMs = activeProgram?.let {
+            (it.endMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+        } ?: 0L
         val line = "线路 ${playingUrlIndex + 1}/${channel.urls.size}"
         val netType = if (currentUrl.contains("ipv6", ignoreCase = true)) "IPV6" else "IPV4"
-        val streamType = getStreamType(currentUrl)
-        tvOsdTechSpecs.text = "$res | $dec | $line | $netType | $streamType | MPEG4 & AAC"
+        val resText = if (resVal.isNotBlank()) resVal else "1920x1080"
+        tvOsdTechSpecs.text = "$line · $resText · ${audioCnLabel()} · $netType | 剩余播放: ${formatRemainingTime(remainingMs)}"
         tvOsdPlayUrl.text = currentUrl
-        
-        val timeFormat = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.CHINESE)
-        val dateFormat = java.text.SimpleDateFormat("MM月dd日", java.util.Locale.CHINESE)
-        val dayFormat = java.text.SimpleDateFormat("EEEE", java.util.Locale.CHINESE)
+
+        // 节目简介（EPG 暂无简介数据）
+        tvOsdDesc.text = "暂无描述信息"
+
+        // 左侧竖排节目名
+        val title = activeProgram?.title ?: channel.name
+        tvOsdVerticalTitle.text = title.take(16).toCharArray().joinToString("\n")
+
+        refreshOsdClock()
+    }
+
+    /** 音频标签转中文：AAC Stereo -> 立体声 */
+    private fun audioCnLabel(): String {
+        val label = com.iptv.tvplayer.player.PlayerStateManager.audioLabel
+        return when {
+            label.contains("Stereo") -> "立体声"
+            label.contains("Mono") -> "单声道"
+            else -> label
+        }
+    }
+
+    /** 剩余时间格式化：7小时13分钟 */
+    private fun formatRemainingTime(ms: Long): String {
+        val totalMinutes = (ms / 60000).coerceAtLeast(0)
+        val h = totalMinutes / 60
+        val m = totalMinutes % 60
+        return when {
+            totalMinutes <= 0 -> "--"
+            h > 0 && m > 0 -> "${h}小时${m}分钟"
+            h > 0 -> "${h}小时"
+            else -> "${m}分钟"
+        }
+    }
+
+    /** 刷新 OSD 时钟 / 日期 / 农历 / 天气 */
+    private fun refreshOsdClock() {
         val now = java.util.Date()
+        val timeFormat = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.CHINESE)
+        val dateFormat = java.text.SimpleDateFormat("M月d日", java.util.Locale.CHINESE)
+        val dayFormat = java.text.SimpleDateFormat("EEEE", java.util.Locale.CHINESE)
         tvOsdClock.text = timeFormat.format(now)
         tvOsdDateWeek.text = "${dateFormat.format(now)} ${dayFormat.format(now)}"
-        
-        // Hide Location
+
+        val lunar = com.iptv.tvplayer.utils.LunarCalendar.fromDate(now)
+        tvOsdLunar.text = lunar.fullText()
+        tvOsdTopWeather.text = buildTopWeatherLine(lunar.shortText())
+        updateWeatherViews()
+    }
+
+    /** 右上角天气摘要：惠州 农历九月十六 30°/23° 多云转晴 */
+    private fun buildTopWeatherLine(lunarShort: String): String {
+        val parts = mutableListOf<String>()
+        if (weatherCity.isNotEmpty()) parts.add(weatherCity)
+        if (lunarShort.isNotEmpty()) parts.add(lunarShort)
+        if (weatherTodayMax.isNotEmpty() || weatherTodayMin.isNotEmpty()) {
+            parts.add("${weatherTodayMax}°/${weatherTodayMin}°")
+        }
+        if (weatherTodayDesc.isNotEmpty()) parts.add(weatherTodayDesc)
+        return parts.joinToString(" ")
+    }
+
+    /** 底栏右侧天气两行 */
+    private fun updateWeatherViews() {
         tvOsdLocation.visibility = View.GONE
-        
-        if (weatherToday.isNotEmpty()) {
-            tvOsdWeatherToday.text = weatherToday
-            tvOsdWeatherToday.visibility = View.VISIBLE
-        } else {
+
+        val todayParts = mutableListOf<String>()
+        if (weatherCity.isNotEmpty()) todayParts.add(weatherCity)
+        if (weatherCurrentTemp.isNotEmpty()) todayParts.add("${weatherCurrentTemp}°C")
+        if (weatherCurrentDesc.isNotEmpty()) todayParts.add(weatherCurrentDesc)
+        if (weatherTodayMin.isNotEmpty() || weatherTodayMax.isNotEmpty()) {
+            todayParts.add("${weatherTodayMin}°~${weatherTodayMax}°")
+        }
+        if (weatherWindDir.isNotEmpty()) todayParts.add(weatherWindDir)
+        if (weatherWindLevel >= 0) todayParts.add("${weatherWindLevel}级")
+        if (todayParts.isEmpty()) {
             tvOsdWeatherToday.visibility = View.GONE
-        }
-        
-        if (weatherTomorrow.isNotEmpty()) {
-            tvOsdWeatherTomorrow.text = weatherTomorrow
-            tvOsdWeatherTomorrow.visibility = View.VISIBLE
         } else {
-            tvOsdWeatherTomorrow.visibility = View.GONE
+            tvOsdWeatherToday.text = todayParts.joinToString(" ")
+            tvOsdWeatherToday.visibility = View.VISIBLE
         }
+
+        val tomorrowParts = mutableListOf<String>()
+        if (weatherTomorrowMax.isNotEmpty() || weatherTomorrowMin.isNotEmpty()) {
+            tomorrowParts.add("明天 ${weatherTomorrowMax}°/${weatherTomorrowMin}°")
+        }
+        if (weatherTomorrowDesc.isNotEmpty()) tomorrowParts.add(weatherTomorrowDesc)
+        if (weatherTomorrowWindLevel in 0..3) {
+            tomorrowParts.add("微风 <3级")
+        } else if (weatherTomorrowWindLevel > 3) {
+            tomorrowParts.add("${weatherTomorrowWindLevel}级")
+        }
+        if (tomorrowParts.isEmpty()) {
+            tvOsdWeatherTomorrow.visibility = View.GONE
+        } else {
+            tvOsdWeatherTomorrow.text = tomorrowParts.joinToString(" ")
+            tvOsdWeatherTomorrow.visibility = View.VISIBLE
+        }
+    }
+
+    /** 风向英文转中文 */
+    private fun translateWindDir(point: String): String {
+        val p = point.uppercase(java.util.Locale.US)
+        return when {
+            p.isEmpty() -> ""
+            p.contains("N") && p.contains("E") -> "东北风"
+            p.contains("N") && p.contains("W") -> "西北风"
+            p.contains("S") && p.contains("E") -> "东南风"
+            p.contains("S") && p.contains("W") -> "西南风"
+            p.startsWith("N") -> "北风"
+            p.startsWith("S") -> "南风"
+            p.startsWith("E") -> "东风"
+            p.startsWith("W") -> "西风"
+            else -> ""
+        }
+    }
+
+    /** 风速(km/h)转蒲福风级 */
+    private fun windLevelOf(kmph: Int): Int = when {
+        kmph <= 1 -> 0
+        kmph <= 5 -> 1
+        kmph <= 11 -> 2
+        kmph <= 19 -> 3
+        kmph <= 28 -> 4
+        kmph <= 38 -> 5
+        kmph <= 49 -> 6
+        kmph <= 61 -> 7
+        else -> 8
     }
 
     private fun startNetworkSpeedMonitor() {
         tvNetworkSpeed.visibility = if (com.iptv.tvplayer.data.SettingsManager.showNetworkSpeed) View.VISIBLE else View.GONE
         lifecycleScope.launch(Dispatchers.Main) {
-            var lastRxBytes = android.net.TrafficStats.getTotalRxBytes()
-            while(isActive) {
+            var lastRxBytes = try {
+                android.net.TrafficStats.getTotalRxBytes()
+            } catch (_: Throwable) {
+                android.net.TrafficStats.UNSUPPORTED.toLong()
+            }
+            while (isActive) {
                 delay(1000)
-                val currentRxBytes = android.net.TrafficStats.getTotalRxBytes()
-                val diff = currentRxBytes - lastRxBytes
-                lastRxBytes = currentRxBytes
-                val speedStr = when {
-                    diff >= 1024 * 1024 -> String.format(java.util.Locale.US, "%.1f MB/s", diff / (1024f * 1024f))
-                    diff >= 1024 -> String.format(java.util.Locale.US, "%.1f KB/s", diff / 1024f)
-                    else -> "$diff B/s"
+                try {
+                    val currentRxBytes = android.net.TrafficStats.getTotalRxBytes()
+                    if (currentRxBytes == android.net.TrafficStats.UNSUPPORTED.toLong() ||
+                        lastRxBytes == android.net.TrafficStats.UNSUPPORTED.toLong()
+                    ) {
+                        tvNetworkSpeed.text = "--"
+                    } else {
+                        val diff = (currentRxBytes - lastRxBytes).coerceAtLeast(0L)
+                        val speedStr = when {
+                            diff >= 1024 * 1024 -> String.format(java.util.Locale.US, "%.1f MB/s", diff / (1024f * 1024f))
+                            diff >= 1024 -> String.format(java.util.Locale.US, "%.1f KB/s", diff / 1024f)
+                            else -> "$diff B/s"
+                        }
+                        tvNetworkSpeed.text = speedStr
+                    }
+                    lastRxBytes = currentRxBytes
+                } catch (t: Throwable) {
+                    tvNetworkSpeed.text = "--"
                 }
-                tvNetworkSpeed.text = speedStr
             }
         }
     }
@@ -548,20 +676,36 @@ class MainActivity : ComponentActivity() {
                         }
                         
                         val todayObj = weatherArr?.optJSONObject(0)
-                        val todayMax = todayObj?.optString("maxtempC", "") ?: ""
-                        val todayMin = todayObj?.optString("mintempC", "") ?: ""
-                        val todayDesc = todayObj?.optJSONArray("hourly")?.optJSONObject(4)?.optJSONArray("weatherDesc")?.optJSONObject(0)?.optString("value", "") ?: ""
-                        val (todayEmoji, todayCh) = translateWeatherDesc(todayDesc)
-                        
+                        weatherTodayMax = todayObj?.optString("maxtempC", "") ?: ""
+                        weatherTodayMin = todayObj?.optString("mintempC", "") ?: ""
+                        val todayDescEn = todayObj?.optJSONArray("hourly")?.optJSONObject(4)?.optJSONArray("weatherDesc")?.optJSONObject(0)?.optString("value", "") ?: ""
+                        weatherTodayDesc = translateWeatherDesc(todayDescEn).second
+
                         val tomorrowObj = weatherArr?.optJSONObject(1)
-                        val tomorrowMax = tomorrowObj?.optString("maxtempC", "") ?: ""
-                        val tomorrowMin = tomorrowObj?.optString("mintempC", "") ?: ""
-                        val tomorrowDesc = tomorrowObj?.optJSONArray("hourly")?.optJSONObject(4)?.optJSONArray("weatherDesc")?.optJSONObject(0)?.optString("value", "") ?: ""
-                        val (tomorrowEmoji, tomorrowCh) = translateWeatherDesc(tomorrowDesc)
-                        
-                        weatherToday = "${todayMax}°/${todayMin}° ${todayCh} ${todayEmoji}"
-                        weatherTomorrow = "${tomorrowMax}°/${tomorrowMin}° ${tomorrowCh} ${tomorrowEmoji}"
+                        weatherTomorrowMax = tomorrowObj?.optString("maxtempC", "") ?: ""
+                        weatherTomorrowMin = tomorrowObj?.optString("mintempC", "") ?: ""
+                        val tomorrowDescEn = tomorrowObj?.optJSONArray("hourly")?.optJSONObject(4)?.optJSONArray("weatherDesc")?.optJSONObject(0)?.optString("value", "") ?: ""
+                        weatherTomorrowDesc = translateWeatherDesc(tomorrowDescEn).second
+                        weatherTomorrowWindLevel = windLevelOf(
+                            tomorrowObj?.optJSONArray("hourly")?.optJSONObject(4)
+                                ?.optString("windspeedKmph", "0")?.toIntOrNull() ?: 0
+                        )
+
+                        val currentObj = json.optJSONObject("current_condition")
+                        weatherCurrentTemp = currentObj?.optString("temp_C", "") ?: ""
+                        val currentDescEn = currentObj?.optJSONArray("weatherDesc")?.optJSONObject(0)?.optString("value", "") ?: ""
+                        weatherCurrentDesc = translateWeatherDesc(currentDescEn).second
+                        weatherWindDir = translateWindDir(currentObj?.optString("winddir16Point", "") ?: "")
+                        weatherWindLevel = windLevelOf(
+                            currentObj?.optString("windspeedKmph", "0")?.toIntOrNull() ?: 0
+                        )
+
                         weatherCity = city
+                        runOnUiThread {
+                            if (!isFinishing && !isDestroyed && bottomOsdBar.visibility == View.VISIBLE) {
+                                refreshOsdClock()
+                            }
+                        }
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("Weather", "HTTP weather fetch failed: ${e.message}")
@@ -936,7 +1080,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     5 -> {
-                        com.iptv.tvplayer.data.SettingsManager.timeoutSeconds = item.identifier.toInt()
+                        com.iptv.tvplayer.data.SettingsManager.timeoutSeconds = item.identifier.toIntOrNull() ?: 15
                         showSettingsLevel(5)
                         android.widget.Toast.makeText(this, "超时时间已切换为 ${item.identifier}秒", android.widget.Toast.LENGTH_SHORT).show()
                     }
@@ -1384,6 +1528,7 @@ class MainActivity : ComponentActivity() {
         }
         
         lifecycleScope.launch {
+            try {
             if (activeUrls.isNotEmpty()) {
                 val mergedCategories = mutableListOf<String>()
                 val mergedChannelsMap = mutableMapOf<String, MutableList<com.iptv.tvplayer.data.Channel>>()
@@ -1495,10 +1640,16 @@ class MainActivity : ComponentActivity() {
                     channelsMap.values.forEach { list -> 
                         list.forEach { com.iptv.tvplayer.data.EpgManager.activeChannelNames.add(it.name) }
                     }
-                    kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                        com.iptv.tvplayer.data.EpgManager.loadEpg(this@MainActivity)
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            channelAdapter.notifyDataSetChanged()
+                    lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        try {
+                            com.iptv.tvplayer.data.EpgManager.loadEpg(this@MainActivity)
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                if (!isFinishing && !isDestroyed) channelAdapter.notifyDataSetChanged()
+                            }
+                        } catch (t: kotlinx.coroutines.CancellationException) {
+                            throw t
+                        } catch (t: Throwable) {
+                            android.util.Log.e("Epg", "load failed", t)
                         }
                     }
                 } else {
@@ -1514,6 +1665,15 @@ class MainActivity : ComponentActivity() {
             }
             splashImage.visibility = View.GONE
             tvLoadingList?.visibility = View.GONE
+            } catch (t: kotlinx.coroutines.CancellationException) {
+                throw t
+            } catch (t: Throwable) {
+                android.util.Log.e("LoadPlaylist", "load playlist failed", t)
+                tvStatus.text = "源加载失败: ${t.message?.take(80) ?: t.javaClass.simpleName}"
+                tvStatus.visibility = View.VISIBLE
+                splashImage.visibility = View.GONE
+                tvLoadingList?.visibility = View.GONE
+            }
         }
     }
 
@@ -1547,7 +1707,20 @@ class MainActivity : ComponentActivity() {
         com.iptv.tvplayer.data.SettingsManager.lastUrlIndex = urlIndex
 
         playJob?.cancel()
-        playJob = lifecycleScope.launch {
+        playJob = lifecycleScope.launch(
+            kotlinx.coroutines.CoroutineExceptionHandler { _, t ->
+                android.util.Log.e("PlayChannel", "play failed", t)
+                if (!isFinishing && !isDestroyed) {
+                    runOnUiThread {
+                        android.widget.Toast.makeText(
+                            this@MainActivity,
+                            "播放失败: ${t.message?.take(60) ?: t.javaClass.simpleName}",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
+        ) {
             delay(250) // 250ms debounce to prevent spamming play requests during rapid switches
             // 内嵌代理参数格式(http://target&socks5://ip:port / ?socks5=ip:port 等)
             // 先归一化为播放器已支持的前缀格式 socks5://ip:port/http://target
@@ -2658,7 +2831,7 @@ override fun shouldInterceptRequest(view: com.tencent.smtt.sdk.WebView?, url: St
 
         btnLanUpload.setOnClickListener {
             alertDialog.dismiss()
-            checkAndCreateFolders()
+            checkAndCreateFolders(forcePrompt = true)
             val ip = getLocalIpAddress()
             showQrDialog("http://$ip:8080", "扫码局域网推流高级配置")
         }
@@ -2896,7 +3069,7 @@ override fun shouldInterceptRequest(view: com.tencent.smtt.sdk.WebView?, url: St
 
         btnLanUpload.setOnClickListener {
             alertDialog.dismiss()
-            checkAndCreateFolders()
+            checkAndCreateFolders(forcePrompt = true)
             val ip = getLocalIpAddress()
             showQrDialog("http://$ip:8080", "扫码添加/推送订阅源")
         }
@@ -3001,7 +3174,7 @@ override fun shouldInterceptRequest(view: com.tencent.smtt.sdk.WebView?, url: St
 
         btnLanUpload.setOnClickListener {
             alertDialog.dismiss()
-            checkAndCreateFolders()
+            checkAndCreateFolders(forcePrompt = true)
             val ip = getLocalIpAddress()
             showQrDialog("http://$ip:8080", "扫码添加/推送EPG")
         }
@@ -3467,7 +3640,7 @@ override fun shouldInterceptRequest(view: com.tencent.smtt.sdk.WebView?, url: St
         return "127.0.0.1"
     }
 
-    private fun checkAndCreateFolders() {
+    private fun checkAndCreateFolders(forcePrompt: Boolean = false) {
         val createDirs = {
             try {
                 val base = java.io.File(android.os.Environment.getExternalStorageDirectory(), "摸鱼TV")
@@ -3483,13 +3656,26 @@ override fun shouldInterceptRequest(view: com.tencent.smtt.sdk.WebView?, url: St
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
             if (!android.os.Environment.isExternalStorageManager()) {
+                // 只在首次启动或用户主动触发时跳系统设置页, 避免每次启动都弹
+                val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                if (!forcePrompt && prefs.getBoolean("all_files_prompted", false)) return
+                prefs.edit().putBoolean("all_files_prompted", true).apply()
+
                 try {
                     val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
                     intent.data = android.net.Uri.parse("package:$packageName")
                     startActivity(intent)
                 } catch (e: Exception) {
-                    val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                    startActivity(intent)
+                    try {
+                        val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                        startActivity(intent)
+                    } catch (t: Throwable) {
+                        android.widget.Toast.makeText(
+                            this,
+                            "当前系统没有所有文件访问权限设置页，请手动在系统设置中授权存储权限",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             } else {
                 createDirs()
@@ -3524,7 +3710,7 @@ override fun shouldInterceptRequest(view: com.tencent.smtt.sdk.WebView?, url: St
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
             if (!android.os.Environment.isExternalStorageManager()) {
                 android.widget.Toast.makeText(this, "请先授予所有文件管理权限", android.widget.Toast.LENGTH_SHORT).show()
-                checkAndCreateFolders()
+                checkAndCreateFolders(forcePrompt = true)
                 return
             }
         } else {
@@ -3536,10 +3722,8 @@ override fun shouldInterceptRequest(view: com.tencent.smtt.sdk.WebView?, url: St
         
         com.iptv.tvplayer.ui.LocalFilePickerDialog(this) { file ->
             val uri = android.net.Uri.fromFile(file)
-            // Use the existing importLocalPlaylist that takes a Uri
-            val m = MainActivity::class.java.getDeclaredMethod("importLocalPlaylist", android.net.Uri::class.java)
-            m.isAccessible = true
-            m.invoke(this, uri)
+            // 直接调用, 避免 release 混淆后反射找不到方法名
+            importLocalPlaylist(uri)
         }.show()
     }
 
@@ -3696,9 +3880,18 @@ override fun shouldInterceptRequest(view: com.tencent.smtt.sdk.WebView?, url: St
 
     override fun onDestroy() {
         playJob?.cancel()
+        try {
+            localServer?.stop()
+        } catch (t: Throwable) {
+            android.util.Log.w("MainActivity", "stop local server failed: ${t.message}")
+        }
+        localServer = null
+        try {
+            com.iptv.tvplayer.player.NativePlayerManager.release()
+        } catch (t: Throwable) {
+            android.util.Log.w("MainActivity", "release player failed: ${t.message}")
+        }
         super.onDestroy()
-        localServer?.stop()
-        com.iptv.tvplayer.player.NativePlayerManager.release()
     }
 }
 

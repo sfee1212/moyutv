@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="960dp"
+    android:height="150dp"
+    android:viewportWidth="960"
+    android:viewportHeight="150">
+    <!-- 外发光 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,130 Q430,160 760,18 L960,18"
+        android:strokeColor="#3300E5FF"
+        android:strokeWidth="6" />
+    <!-- 弧形主线 -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,130 Q430,160 760,18 L960,18"
+        android:strokeColor="#9900E5FF"
+        android:strokeWidth="1.5" />
+</vector>

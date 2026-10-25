@@ -1,4 +1,4 @@
-package com.iptv.tvplayer.player
+﻿package com.iptv.tvplayer.player
 
 import android.content.Context
 import android.view.LayoutInflater
@@ -29,6 +29,15 @@ object NativePlayerManager {
     private var timeoutJob: Job? = null
     var onAutoSwitchRequested: (() -> Unit)? = null
 
+    /** 回调来自 Activity, 页面销毁/状态异常时不能让异常冒泡到播放协程 */
+    private fun requestAutoSwitch() {
+        try {
+            onAutoSwitchRequested?.invoke()
+        } catch (t: Throwable) {
+            android.util.Log.e("NativePlayer", "auto switch callback failed", t)
+        }
+    }
+
     // ===== 弱网优化状态 =====
     // 已成功起播过(弱网容忍加码): 卡缓冲超时额外 +10s 再切台, 避免短暂弱网被切走
     @Volatile private var playedOnce = false
@@ -57,9 +66,14 @@ object NativePlayerManager {
     private fun startTimeoutJob() {
         timeoutJob?.cancel()
         val graceExtra = if (playedOnce) 10_000L else 0L
+        val timeoutMs = SettingsManager.timeoutSeconds.coerceIn(5, 120) * 1000L
         timeoutJob = CoroutineScope(Dispatchers.Main).launch {
-            delay(SettingsManager.timeoutSeconds * 1000L + graceExtra)
-            onAutoSwitchRequested?.invoke()
+            delay(timeoutMs + graceExtra)
+            try {
+                requestAutoSwitch()
+            } catch (t: Throwable) {
+                android.util.Log.e("NativePlayer", "auto switch callback failed", t)
+            }
         }
     }
 
@@ -94,7 +108,7 @@ object NativePlayerManager {
                         }
                     }
                 } else if (mpvInitialized) {
-                    val isPaused = try { MPV.INSTANCE.getPropertyBoolean("core-idle") ?: false } catch (e: Exception) { false }
+                    val isPaused = try { MPV.INSTANCE.getPropertyBoolean("core-idle") ?: false } catch (t: Throwable) { false }
                     if (!isPaused) {
                         isCurrentlyPlaying = true
                         progressChanged = true // As long as it's not idle, we assume it's playing fine
@@ -111,7 +125,7 @@ object NativePlayerManager {
                             if (SettingsManager.autoReconnect && reloadAction != null) {
                                 reloadAction()
                             } else {
-                                onAutoSwitchRequested?.invoke()
+                                requestAutoSwitch()
                             }
                         }
                     }
@@ -386,12 +400,20 @@ object NativePlayerManager {
                             delay(800)
                             if (gen == playGen && exoPlayer === target && target != null
                                 && target.playbackState == Player.STATE_IDLE) {
-                                target.prepare()
-                                target.playWhenReady = true
+                                try {
+                                    target.prepare()
+                                    target.playWhenReady = true
+                                } catch (t: Throwable) {
+                                    android.util.Log.w("NativePlayer", "reconnect failed: ${t.message}")
+                                }
                             }
                         }
                     } else {
-                        onAutoSwitchRequested?.invoke()
+                        try {
+                            requestAutoSwitch()
+                        } catch (t: Throwable) {
+                            android.util.Log.e("NativePlayer", "auto switch callback failed", t)
+                        }
                     }
                 }
                 override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
@@ -431,7 +453,7 @@ object NativePlayerManager {
             }
 
             if (finalUrl.isEmpty()) {
-                onAutoSwitchRequested?.invoke()
+                requestAutoSwitch()
                 return@launch
             }
 
@@ -667,7 +689,7 @@ object NativePlayerManager {
                 }
                 
                 if (finalUrl.isEmpty()) {
-                    onAutoSwitchRequested?.invoke()
+                    requestAutoSwitch()
                     return@launch
                 }
 
@@ -837,6 +859,7 @@ object NativePlayerManager {
         )
         surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(holder: SurfaceHolder) {
+                try {
                 synchronized(mpvLock) {
                     // 先尝试以绝对路径重新加载（对 Android 14/HyperOS 的兜底）
                     if (!`is`.xyz.mpv.MPV.isLoaded) {
@@ -853,7 +876,7 @@ object NativePlayerManager {
                             }
                             android.widget.Toast.makeText(context, "MPV load failed: $shortMsg\nSwitched to EXO", android.widget.Toast.LENGTH_LONG).show()
                             SettingsManager.decoderType = "EXO"
-                            onAutoSwitchRequested?.invoke()
+                            requestAutoSwitch()
                         }
                         return
                     }
@@ -968,7 +991,7 @@ object NativePlayerManager {
                                 if (SettingsManager.autoReconnect) {
                                     loadMpvUrl(actualUrl)
                                 } else {
-                                    onAutoSwitchRequested?.invoke()
+                                    requestAutoSwitch()
                                 }
                             } else if (property == "paused-for-cache") {
                                 if (value) {
@@ -1024,6 +1047,17 @@ object NativePlayerManager {
                         pendingMpvHeaders = null
                     }
                 }
+                } catch (t: Throwable) {
+                    android.util.Log.e("NativePlayer", "MPV surface init failed", t)
+                    try { MPV.INSTANCE.destroy() } catch (_: Throwable) {}
+                    mpvInitialized = false
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        try {
+                            SettingsManager.decoderType = "EXO"
+                            requestAutoSwitch()
+                        } catch (_: Throwable) {}
+                    }
+                }
             }
             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
                 synchronized(mpvLock) {
@@ -1041,7 +1075,9 @@ object NativePlayerManager {
                             MPV.INSTANCE.setPropertyString("vo", "null")
                             MPV.INSTANCE.detachSurface()
                             MPV.INSTANCE.destroy()
-                        } catch (e: Exception) {}
+                        } catch (t: Throwable) {
+                            android.util.Log.w("NativePlayer", "MPV surface destroy failed: ${t.message}")
+                        }
                         mpvInitialized = false
                     }
                 }
@@ -1066,7 +1102,9 @@ object NativePlayerManager {
                     MPV.INSTANCE.setPropertyString("vo", "null")
                     MPV.INSTANCE.detachSurface()
                     MPV.INSTANCE.destroy()
-                } catch (e: Exception) {}
+                } catch (t: Throwable) {
+                    android.util.Log.w("NativePlayer", "MPV destroy failed: ${t.message}")
+                }
                 mpvInitialized = false
             }
         }

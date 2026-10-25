@@ -58,7 +58,16 @@ class TvPlayerApplication : Application() {
         // Print signature hash for release reference and run security checks
         android.util.Log.i("SecurityCheck", "App Signature SHA-256: " + com.iptv.tvplayer.utils.SecurityCheck.getSignatureSHA256(this))
         if (com.iptv.tvplayer.utils.SecurityCheck.checkSecurity(this)) {
-            com.iptv.tvplayer.utils.SecurityCheck.terminateApp()
+            // 兼容性优先: 部分电视盒子自带 Xposed/LSPosed 或调试环境,
+            // 直接杀进程会导致应用"闪退"无法启动。这里只记录日志, 不终止。
+            android.util.Log.w("SecurityCheck", "Security check flagged this environment; continuing for compatibility")
+        }
+
+        // 尽早初始化设置 (SharedPreferences 在 Activity 之前就绪, 避免 lateinit 崩溃)
+        try {
+            com.iptv.tvplayer.data.SettingsManager.init(this)
+        } catch (t: Throwable) {
+            android.util.Log.e("TvPlayerApp", "SettingsManager init failed: ${t.message}", t)
         }
 
         // 尽早以绝对路径加载 MPV 库，绕过 Android 14/HyperOS linker namespace 限制

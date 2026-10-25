@@ -165,9 +165,9 @@ object PhpScriptManager {
             }
             Log.d(TAG, "execute << $scriptName in ${System.currentTimeMillis() - t0}ms: $result")
             result
-        } catch (e: Exception) {
-            Log.e(TAG, "execute script failed: $scriptName", e)
-            PhpResult.Error(502, "脚本执行失败: ${e.message}")
+        } catch (t: Throwable) {
+            Log.e(TAG, "execute script failed: $scriptName", t)
+            PhpResult.Error(502, "脚本执行失败: ${t.message}")
         }
     }
 
@@ -223,15 +223,27 @@ object PhpScriptManager {
     }
 
     private fun locateScript(scriptRef: String): File? {
+        val isFileUri = scriptRef.startsWith("file://", ignoreCase = true)
         val name = when {
             scriptRef.startsWith("local://", ignoreCase = true) -> scriptRef.substring(8)
-            scriptRef.startsWith("file://", ignoreCase = true) -> scriptRef.substring(7)
+            isFileUri -> scriptRef.substring(7)
             else -> scriptRef
+        }.trim()
+
+        if (name.isEmpty()) return null
+        // 防止 local://../../xxx 读取任意文件; 允许子目录, 但拒绝 .. 与绝对路径
+        if (!isFileUri && (name.contains("..") || name.startsWith("/") || name.startsWith("\\") || name.contains(":"))) {
+            Log.w(TAG, "Rejected suspicious script path: $scriptRef")
+            return null
         }
+        if (!name.endsWith(".php", ignoreCase = true) && !name.endsWith(".py", ignoreCase = true)) {
+            return null
+        }
+
         // file:// 绝对路径
-        if (scriptRef.startsWith("file://", ignoreCase = true)) {
+        if (isFileUri) {
             val abs = File(name)
-            if (abs.isFile) return abs
+            return if (abs.isFile) abs else null
         }
         // 搜索目录: 摸鱼TV/php, 摸鱼TV/py (兼容旧的 摸鱼TV/PHP), 应用私有目录
         val dirNames = arrayOf("php", "py", "PHP")

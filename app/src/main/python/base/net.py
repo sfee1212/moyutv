@@ -81,6 +81,47 @@ def _safe_json(value):
         return str(value)
 
 
+class _Resp(dict):
+    """兼容 FongMi/CatVod 的属性访问: r.code / r.content / r.headers / r.ok。"""
+
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
+
+    @property
+    def ok(self):
+        try:
+            return 200 <= int(self.get("code") or 0) < 300
+        except Exception:
+            return False
+
+    @property
+    def text(self):
+        return self.get("content") or ""
+
+
+def _decode_text(r):
+    """requests 对 text/* 未声明 charset 时默认 ISO-8859-1, 中文会乱码。"""
+    enc = (getattr(r, "encoding", None) or "").lower()
+    if enc and enc not in ("iso-8859-1", "latin-1"):
+        try:
+            return r.text
+        except Exception:
+            pass
+    raw = r.content
+    for name in ("utf-8", "gb18030", "big5"):
+        try:
+            return raw.decode(name)
+        except Exception:
+            pass
+    try:
+        return r.text
+    except Exception:
+        return ""
+
+
 class _SessionFlow:
     """net.session() 的会话对象: 独立 Cookie 流程。"""
 
@@ -118,7 +159,13 @@ def _do_req(session, url, options, mem_cookie):
     try:
         method = str(options.get("method") or "GET").upper()
         headers = {str(k): str(v) for k, v in (options.get("headers") or {}).items()}
-        timeout = float(options.get("timeout") or 15000) / 1000.0
+        # CatVod 脚本的 timeout 通常是毫秒 (5000); 也兼容直接写秒 (5/10)
+        try:
+            raw_timeout = float(options.get("timeout") or 15000)
+        except Exception:
+            raw_timeout = 15000.0
+        timeout = raw_timeout / 1000.0 if raw_timeout > 100 else raw_timeout
+        timeout = max(1.0, min(timeout, 60.0))
         if mem_cookie:
             ck = mem_cookie.get(_host_of(url))
             if ck and not any(k.lower() == "cookie" for k in headers):
@@ -139,12 +186,12 @@ def _do_req(session, url, options, mem_cookie):
         kwargs["allow_redirects"] = bool(allow_redirects)
         r = session.request(method, str(url), **kwargs)
         buf = int(options.get("buffer") or 0)
-        content = r.content if buf >= 3 else r.text
-        return {"code": r.status_code, "content": content,
-                "headers": dict(r.headers), "error": ""}
+        content = r.content if buf >= 3 else _decode_text(r)
+        return _Resp({"code": r.status_code, "content": content,
+                      "headers": dict(r.headers), "error": ""})
     except Exception as e:
-        return {"code": -1, "content": "", "headers": {},
-                "error": "%s: %s" % (type(e).__name__, e)}
+        return _Resp({"code": -1, "content": "", "headers": {},
+                      "error": "%s: %s" % (type(e).__name__, e)})
 
 
 class Net:

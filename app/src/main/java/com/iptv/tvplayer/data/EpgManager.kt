@@ -10,6 +10,7 @@ import java.io.FileInputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.nio.charset.Charset
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.text.SimpleDateFormat
@@ -53,10 +54,17 @@ object EpgManager {
         }
         return conn
     }
-    private val channelToPrograms = HashMap<String, MutableList<EpgProgram>>()
-    private val channelIdToName = HashMap<String, String>()
-    private val channelToLogo = HashMap<String, String>()
+    // 解析在 IO 线程进行, UI 线程会同时读取。整体替换不可变 Map, 避免
+    // ConcurrentModificationException 以及读到"清空后只填了一半"的中间状态。
+    @Volatile
+    private var channelToPrograms: Map<String, List<EpgProgram>> = emptyMap()
+
+    @Volatile
+    private var channelToLogo: Map<String, String> = emptyMap()
+
     val activeChannelNames = mutableSetOf<String>()
+
+    @Volatile
     private var lastUpdateMillis = 0L
     private const val CACHE_FILE_NAME = "epg_cache.xml"
 
@@ -89,7 +97,7 @@ object EpgManager {
         if (cacheFile.exists() && cacheFile.length() > 1000 && System.currentTimeMillis() - cacheFile.lastModified() < 24 * 60 * 60 * 1000) {
             Log.d(TAG, "Using cached EPG file (${cacheFile.length()} bytes)")
             try {
-                parseXml(FileInputStream(cacheFile), localActiveNames)
+                parseXml(FileInputStream(cacheFile), localActiveNames, detectXmlCharset(cacheFile))
                 Log.d(TAG, "Parsed from cache, programs map size: ${channelToPrograms.size}")
                 return@withContext
             } catch (e: Exception) {
@@ -172,8 +180,8 @@ object EpgManager {
 
                 try {
                     // Fix unescaped & characters (line-by-line, no OOM risk)
-                    fixXmlEntities(cacheFile)
-                    parseXml(FileInputStream(cacheFile), localActiveNames)
+                    fixXmlEntities(cacheFile, detectXmlCharset(cacheFile))
+                    parseXml(FileInputStream(cacheFile), localActiveNames, detectXmlCharset(cacheFile))
                     Log.d(TAG, "Parsing done! Programs map size: ${channelToPrograms.size}")
                     downloaded = true
                 } catch (e: Exception) {
@@ -190,17 +198,38 @@ object EpgManager {
     }
 
     /**
-     * Preprocesses an XML file to escape bare & characters line-by-line.
-     * Using line-by-line avoids OOM for large files (e.g. 50MB+ decompressed EPG).
-     * Writes to a temp file then renames back atomically.
+     * 检测 XML 编码: BOM 优先, 其次 XML 声明里的 encoding=。
+     * 很多国内 EPG 源是 GBK/GB18030, 统一按 UTF-8 解析会得到乱码节目名。
      */
-    private fun fixXmlEntities(file: File) {
+    private fun detectXmlCharset(file: File): String {
+        return try {
+            val head = ByteArray(512)
+            val read = FileInputStream(file).use { it.read(head) }
+            if (read >= 2) {
+                if (head[0] == 0xFF.toByte() && head[1] == 0xFE.toByte()) return "UTF-16LE"
+                if (head[0] == 0xFE.toByte() && head[1] == 0xFF.toByte()) return "UTF-16BE"
+            }
+            val text = String(head, 0, read.coerceAtLeast(0), Charsets.ISO_8859_1)
+            val match = Regex("encoding\\s*=\\s*[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE).find(text)
+            val encoding = match?.groupValues?.getOrNull(1)?.trim().orEmpty()
+            if (encoding.isNotEmpty() && Charset.isSupported(encoding)) encoding else "UTF-8"
+        } catch (_: Throwable) {
+            "UTF-8"
+        }
+    }
+
+    private fun fixXmlEntities(file: File, charsetName: String = "UTF-8") {
         try {
+            val charset = try {
+                Charset.forName(charsetName)
+            } catch (_: Throwable) {
+                Charsets.UTF_8
+            }
             val regex = Regex("&(?!(amp|lt|gt|quot|apos|#[0-9]+|#x[0-9a-fA-F]+);)")
             val tempFile = File(file.parent, file.name + ".tmp")
             var anyFixed = false
-            file.bufferedReader(Charsets.UTF_8).use { reader ->
-                tempFile.bufferedWriter(Charsets.UTF_8).use { writer ->
+            file.bufferedReader(charset).use { reader ->
+                tempFile.bufferedWriter(charset).use { writer ->
                     reader.forEachLine { line ->
                         val fixed = line.replace(regex, "&amp;")
                         if (fixed != line) anyFixed = true
@@ -275,10 +304,12 @@ object EpgManager {
     }
 
 
-    private fun parseXml(inputStream: InputStream, localActiveNames: Set<String>) {
-        Log.d(TAG, "parseXml called, activeNames count=${localActiveNames.size}")
-        channelToPrograms.clear()
-        channelIdToName.clear()
+    private fun parseXml(inputStream: InputStream, localActiveNames: Set<String>, charsetName: String = "UTF-8") {
+        Log.d(TAG, "parseXml called, activeNames count=${localActiveNames.size}, charset=$charsetName")
+
+        // 先构建到局部 Map, 解析完成后整体替换, 避免 UI 线程读到中间状态
+        val newPrograms = HashMap<String, MutableList<EpgProgram>>()
+        val newLogos = HashMap<String, String>()
 
         // Precompute and cache normalized M3U channel names once to avoid heavy repetitive regex computation
         val normalizedM3uToOriginals = HashMap<String, MutableList<String>>()
@@ -293,7 +324,7 @@ object EpgManager {
             val factory = XmlPullParserFactory.newInstance()
             factory.isNamespaceAware = true
             val parser = factory.newPullParser()
-            parser.setInput(inputStream, "UTF-8")
+            parser.setInput(inputStream, charsetName)
 
             var eventType = parser.eventType
             var currentChannelId = ""
@@ -327,7 +358,7 @@ object EpgManager {
                             if (currentChannelId.isNotEmpty()) {
                                 currentChannelName = parser.nextText().trim()
                                 if (currentChannelName.isNotEmpty()) {
-                                    channelIdToName[currentChannelId] = currentChannelName
+                                    // display-name 只用于匹配 M3U 频道名
                                     val matches = findMatchingM3uNames(currentChannelName, normalizedM3uToOriginals)
                                     if (matches.isNotEmpty()) {
                                         val existing = xmlChannelIdToM3uNames[currentChannelId]
@@ -377,7 +408,7 @@ object EpgManager {
                                     for (m3uName in m3uMatches) {
                                         // Key by normalized name so lookup always works regardless of exact case/spacing
                                         val key = normalizeChannelName(m3uName)
-                                        val list = channelToPrograms.getOrPut(key) { mutableListOf() }
+                                        val list = newPrograms.getOrPut(key) { mutableListOf() }
                                         list.add(program)
                                     }
                                 } catch (e: Exception) {
@@ -393,21 +424,24 @@ object EpgManager {
                 eventType = parser.next()
             }
             
-            channelToLogo.clear()
             xmlChannelIdToLogo.forEach { (channelId, logoUrl) ->
                 val m3uNames = xmlChannelIdToM3uNames[channelId]
                 if (m3uNames != null) {
                     for (name in m3uNames) {
                         // Key by normalized name to match lookup
-                        channelToLogo[normalizeChannelName(name)] = logoUrl
+                        newLogos[normalizeChannelName(name)] = logoUrl
                     }
                 }
             }
 
             // Sort programs by start time
-            channelToPrograms.values.forEach { list ->
+            newPrograms.values.forEach { list ->
                 list.sortBy { it.startMillis }
             }
+
+            // 原子替换, UI 线程要么看到旧数据, 要么看到完整的新数据
+            channelToPrograms = newPrograms.mapValues { it.value.toList() }
+            channelToLogo = newLogos
             lastUpdateMillis = System.currentTimeMillis()
             Log.d(TAG, "parseXml complete: ${channelToPrograms.size} channels matched, total programs=${channelToPrograms.values.sumOf { it.size }}")
             // Log first few matched channel names for debugging
@@ -418,14 +452,41 @@ object EpgManager {
     }
 
     private fun parseTime(timeStr: String, sdf: SimpleDateFormat, sdfFallback: SimpleDateFormat): Long {
+        val text = timeStr.trim()
+        // XMLTV 常见: 20240528140000 +0800 / 20240528140000+0800 / 20240528140000
+        val match = Regex("^(\\d{4})(\\d{2})(\\d{2})(\\d{2})(\\d{2})(\\d{2})\\s*([+-]\\d{4}|Z)?").find(text)
+        if (match != null) {
+            val values = match.groupValues
+            val zone = when {
+                values[7].equals("Z", ignoreCase = true) -> TimeZone.getTimeZone("GMT")
+                values[7].isNotEmpty() -> TimeZone.getTimeZone("GMT${values[7]}")
+                else -> TimeZone.getDefault()
+            }
+            return try {
+                val calendar = Calendar.getInstance(zone)
+                calendar.isLenient = false
+                calendar.clear()
+                calendar.set(
+                    values[1].toInt(),
+                    values[2].toInt() - 1,
+                    values[3].toInt(),
+                    values[4].toInt(),
+                    values[5].toInt(),
+                    values[6].toInt()
+                )
+                calendar.timeInMillis
+            } catch (_: Exception) {
+                0L
+            }
+        }
         return try {
-            sdf.parse(timeStr)?.time ?: 0L
-        } catch (e: Exception) {
+            sdf.parse(text)?.time ?: 0L
+        } catch (_: Exception) {
             try {
-                if (timeStr.length >= 14) {
-                    sdfFallback.parse(timeStr.substring(0, 14))?.time ?: 0L
+                if (text.length >= 14) {
+                    sdfFallback.parse(text.substring(0, 14))?.time ?: 0L
                 } else 0L
-            } catch (ex: Exception) {
+            } catch (_: Exception) {
                 0L
             }
         }

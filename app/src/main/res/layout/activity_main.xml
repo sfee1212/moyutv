@@ -244,300 +244,349 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Curved Bottom OSD Bar -->
-        <RelativeLayout
+        <!-- ==================== OSD 层（底部信息栏 + 右上角信息 + 左侧竖排节目名） ==================== -->
+        <FrameLayout
             android:id="@+id/bottom_osd_bar"
-            android:layout_width="800dp"
-            android:layout_height="140dp"
-            android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="12dp"
-            android:background="@drawable/bg_osd_bar"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="8dp"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:visibility="gone">
 
-            <!-- Left and Middle Area -->
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_toStartOf="@+id/osd_right_panel"
-                android:layout_marginEnd="16dp"
-                android:layout_marginTop="4dp">
+            <!-- 左侧竖排当前节目名 -->
+            <TextView
+                android:id="@+id/tv_osd_vertical_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start|center_vertical"
+                android:layout_marginStart="42dp"
+                android:background="@drawable/bg_osd_title_ribbon"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:lineSpacingExtra="2dp"
+                android:maxLines="16"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="12dp"
+                android:shadowColor="#99000000"
+                android:shadowDx="0"
+                android:shadowDy="1"
+                android:shadowRadius="4"
+                android:text="节目名称"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
 
-                <!-- Row 1: Channel Logo + Number + Name + Badges -->
-                <LinearLayout
-                    android:id="@+id/osd_row_1"
-                    android:layout_width="match_parent"
+            <!-- 右上角：天气摘要 + 频道号 -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="16dp"
+                android:layout_marginEnd="28dp"
+                android:gravity="end"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_osd_top_weather"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_alignParentTop="true">
+                    android:shadowColor="#CC000000"
+                    android:shadowDx="0"
+                    android:shadowDy="1"
+                    android:shadowRadius="4"
+                    android:singleLine="true"
+                    android:text=""
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:gravity="bottom"
+                    android:orientation="horizontal">
 
                     <TextView
-                        android:id="@+id/tv_osd_channel_name"
+                        android:id="@+id/tv_osd_top_badge"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Channel"
-                        android:textColor="#FF00D2FF"
-                        android:textSize="19sp"
-                        android:textStyle="bold"
-                        android:layout_marginStart="0dp"
-                        android:singleLine="true" />
-
-                    <Space
-                        android:layout_width="16dp"
-                        android:layout_height="wrap_content" />
-
-                    <TextView
-                        android:id="@+id/tv_osd_badge_catchup"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="回看"
-                        android:textColor="#FFFFFF"
-                        android:textSize="10sp"
-                        android:background="@drawable/bg_badge"
-                        android:paddingHorizontal="4dp"
-                        android:paddingVertical="1dp"
                         android:layout_marginEnd="8dp"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/tv_osd_badge_res"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="HD"
-                        android:textColor="#CCCCCC"
-                        android:textSize="10sp"
-                        android:background="@drawable/bg_badge"
-                        android:paddingHorizontal="4dp"
-                        android:paddingVertical="1dp" />
-
-                    <TextView
-                        android:id="@+id/tv_osd_badge_audio"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Dolby 2.0"
-                        android:textColor="#CCCCCC"
-                        android:textSize="10sp"
-                        android:background="@drawable/bg_badge"
-                        android:paddingHorizontal="4dp"
+                        android:layout_marginBottom="10dp"
+                        android:background="@drawable/bg_osd_gold_badge"
+                        android:paddingStart="4dp"
+                                android:paddingEnd="4dp"
                         android:paddingVertical="1dp"
-                        android:layout_marginStart="4dp" />
-
-                    <TextView
-                        android:id="@+id/tv_osd_badge_aspect"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="16:9"
-                        android:textColor="#CCCCCC"
+                        android:text="高清"
+                        android:textColor="#4A3200"
                         android:textSize="10sp"
-                        android:background="@drawable/bg_badge"
-                        android:paddingHorizontal="4dp"
-                        android:paddingVertical="1dp"
-                        android:layout_marginStart="4dp" />
+                        android:textStyle="bold" />
 
                     <TextView
-                        android:id="@+id/tv_osd_tech_specs"
+                        android:id="@+id/tv_osd_top_channel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="1920x1080 | MPV | 线路 1/1 | IPV4 | MPEG4 &amp; AAC"
-                        android:textColor="#CCCCCC"
-                        android:textSize="12sp"
-                        android:layout_marginStart="8dp" />
-
+                        android:fontFamily="sans-serif-light"
+                        android:letterSpacing="0.02"
+                        android:shadowColor="#8800D2FF"
+                        android:shadowDx="0"
+                        android:shadowDy="0"
+                        android:shadowRadius="12"
+                        android:text="0001"
+                        android:textColor="#EAF7FF"
+                        android:textSize="46sp" />
                 </LinearLayout>
+            </LinearLayout>
 
-                <!-- Row 2: Current EPG Program -->
-                <LinearLayout
-                    android:id="@+id/osd_row_2"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:layout_below="@id/osd_row_1"
-                    android:layout_marginTop="6dp">
+            <!-- 大时钟（浮在底栏上方的视频画面区域） -->
+            <TextView
+                android:id="@+id/tv_osd_clock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_marginEnd="30dp"
+                android:layout_marginBottom="156dp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.04"
+                android:shadowColor="#9900D2FF"
+                android:shadowDx="0"
+                android:shadowDy="0"
+                android:shadowRadius="14"
+                android:text="00:00:00"
+                android:textColor="#F2FDFF"
+                android:textSize="38sp"
+                android:textStyle="bold" />
 
-                    <TextView
-                        android:id="@+id/tv_osd_epg_current"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="18:00 ~ 19:00 ????"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:singleLine="true" />
-
-                    <!-- Progress Bar + Timings moved below program name -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:layout_marginTop="4dp">
-
-                        <ProgressBar
-                            android:id="@+id/pb_osd_epg"
-                            style="?android:attr/progressBarStyleHorizontal"
-                            android:layout_width="150dp"
-                            android:layout_height="6dp"
-                            android:max="100"
-                            android:progress="50"
-                            android:progressDrawable="@drawable/osd_progress_bar"
-                            android:layout_marginEnd="12dp" />
-
-                        <TextView
-                            android:id="@+id/tv_osd_epg_elapsed"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="+30 分钟"
-                            android:textColor="#FF00D2FF"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tv_osd_epg_remaining"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="30 分钟"
-                            android:textColor="#FFFFFF"
-                            android:textSize="12sp"
-                            android:layout_marginStart="6dp" />
-
-                    </LinearLayout>
-
-                </LinearLayout>
-
-                <!-- Row 3: Next EPG Program -->
-                <LinearLayout
-                    android:id="@+id/osd_row_3"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_below="@id/osd_row_2"
-                    android:layout_marginTop="6dp">
-
-                    <TextView
-                        android:id="@+id/tv_osd_epg_next"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="19:00 ~ 20:00 ????"
-                        android:textColor="#88FFFFFF"
-                        android:textSize="13sp"
-                        android:singleLine="true" />
-
-                </LinearLayout>
-
-                <!-- Row 4: Tech Specs & Codecs -->
-                <RelativeLayout
-                    android:id="@+id/osd_row_4"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentBottom="true"
-                    android:layout_marginBottom="4dp">
-
-                    <!-- Left: Playback URL -->
-                    <TextView
-                        android:id="@+id/tv_osd_play_url"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="http://example.com/playlist.m3u8"
-                        android:textColor="#00FF00"
-                        android:textSize="12sp"
-                        android:layout_alignParentStart="true"
-                        android:layout_centerVertical="true"
-                        android:singleLine="true"
-                        android:ellipsize="marquee"
-                        android:marqueeRepeatLimit="marquee_forever"
-                        android:focusable="true"
-                        android:focusableInTouchMode="true"
-                        android:scrollHorizontally="true" />
-
-                </RelativeLayout>
-
-            </RelativeLayout>
-
-            <!-- Right Curved Panel -->
-            <RelativeLayout
-                android:id="@+id/osd_right_panel"
-                android:layout_width="160dp"
-                android:layout_height="match_parent"
-                android:layout_alignParentEnd="true"
-                android:background="@drawable/bg_osd_right"
-                android:paddingStart="40dp"
-                android:paddingTop="12dp"
-                android:paddingBottom="12dp"
-                android:paddingEnd="16dp">
+            <!-- 底部渐变信息栏 -->
+            <FrameLayout
+                android:id="@+id/osd_bottom_panel"
+                android:layout_width="match_parent"
+                android:layout_height="150dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/bg_osd_panel">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:gravity="center_vertical">
+                    android:orientation="horizontal"
+                    android:paddingStart="30dp"
+                    android:paddingTop="22dp"
+                    android:paddingEnd="28dp"
+                    android:paddingBottom="8dp">
 
-                    <!-- Time (Clock) -->
-                    <TextView
-                        android:id="@+id/tv_osd_clock"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="18:58:32"
-                        android:textColor="#FF00D2FF"
-                        android:textSize="24sp"
-                        android:textStyle="bold" />
-
-                    <!-- Date & Weekday -->
-                    <TextView
-                        android:id="@+id/tv_osd_date_week"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="2026-06-28 ???"
-                        android:textColor="#FFFFFF"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <!-- Location -->
-                    <TextView
-                        android:id="@+id/tv_osd_location"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="地区"
-                        android:textColor="#FFFFFF"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <!-- Weather Info -->
+                    <!-- 左区：频道名 / 技参数 / 正在播放 / 接下来 / 描述 / 进度 -->
                     <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:layout_marginTop="6dp">
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
 
-                        <!-- Today Weather -->
+                        <LinearLayout
+                            android:id="@+id/osd_row_1"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/tv_osd_channel_name"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:shadowColor="#80000000"
+                                android:shadowDx="0"
+                                android:shadowDy="1"
+                                android:shadowRadius="4"
+                                android:text="频道名称"
+                                android:textColor="#FFFFFF"
+                                android:textSize="24sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tv_osd_badge_catchup"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:background="@drawable/bg_badge"
+                                android:paddingStart="4dp"
+                                android:paddingEnd="4dp"
+                                android:paddingVertical="1dp"
+                                android:text="回看"
+                                android:textColor="#FFFFFF"
+                                android:textSize="10sp"
+                                android:visibility="gone" />
+
+                            <Space
+                                android:layout_width="16dp"
+                                android:layout_height="wrap_content" />
+
+                            <TextView
+                                android:id="@+id/tv_osd_tech_specs"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="线路 1/1 · 1920x1080 · 立体声 · IPV4 | 剩余播放: --"
+                                android:textColor="#B9E9F7"
+                                android:textSize="13sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/osd_row_2"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/tv_osd_epg_current"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="正在播放: --"
+                                android:textColor="#FFFFFF"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tv_osd_epg_next"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="24dp"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="接下来: --"
+                                android:textColor="#FFFFFF"
+                                android:textSize="15sp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tv_osd_desc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:text="暂无描述信息"
+                            android:textColor="#A9D8E8"
+                            android:textSize="12sp" />
+
+                        <ProgressBar
+                            android:id="@+id/pb_osd_epg"
+                            style="?android:attr/progressBarStyleHorizontal"
+                            android:layout_width="220dp"
+                            android:layout_height="3dp"
+                            android:layout_marginTop="8dp"
+                            android:max="100"
+                            android:progress="0"
+                            android:progressDrawable="@drawable/osd_progress_bar" />
+
+                        <!-- 兼容旧逻辑的隐藏控件（新版界面不展示） -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="0dp"
+                            android:visibility="gone">
+
+                            <TextView
+                                android:id="@+id/tv_osd_badge_res"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="HD" />
+
+                            <TextView
+                                android:id="@+id/tv_osd_badge_audio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="AAC" />
+
+                            <TextView
+                                android:id="@+id/tv_osd_badge_aspect"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="16:9" />
+
+                            <TextView
+                                android:id="@+id/tv_osd_epg_elapsed"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="+0 分钟" />
+
+                            <TextView
+                                android:id="@+id/tv_osd_epg_remaining"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0 分钟" />
+
+                            <TextView
+                                android:id="@+id/tv_osd_play_url"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="" />
+
+                            <TextView
+                                android:id="@+id/tv_osd_location"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- 右区：日期 / 农历 / 天气 -->
+                    <LinearLayout
+                        android:layout_width="250dp"
+                        android:layout_height="match_parent"
+                        android:gravity="end"
+                        android:orientation="vertical"
+                        android:paddingStart="20dp"
+                        android:paddingTop="24dp">
+
+                        <TextView
+                            android:id="@+id/tv_osd_date_week"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:shadowColor="#80000000"
+                            android:shadowDx="0"
+                            android:shadowDy="1"
+                            android:shadowRadius="4"
+                            android:text="1月1日 星期一"
+                            android:textColor="#FFFFFF"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_osd_lunar"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="农历 甲子鼠年 正月初一"
+                            android:textColor="#D6F4FF"
+                            android:textSize="12sp" />
+
                         <TextView
                             android:id="@+id/tv_osd_weather_today"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                        android:text="Today: --"
-                            android:textColor="#CCCCCC"
-                            android:textSize="10sp" />
+                            android:layout_marginTop="8dp"
+                            android:gravity="end"
+                            android:text="--"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp" />
 
-                        <!-- Tomorrow Weather -->
                         <TextView
                             android:id="@+id/tv_osd_weather_tomorrow"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                        android:text="Tomorrow: --"
-                            android:textColor="#88FFFFFF"
-                            android:textSize="10sp" />
-
+                            android:gravity="end"
+                            android:text="--"
+                            android:textColor="#BFE6F3"
+                            android:textSize="11sp" />
                     </LinearLayout>
-
                 </LinearLayout>
-
-            </RelativeLayout>
-
-        </RelativeLayout>
+            </FrameLayout>
+        </FrameLayout>
 
     </FrameLayout>
 

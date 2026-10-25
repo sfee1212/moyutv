@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 半透明青蓝渐变底板：顶部透明，底部加深 -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#140E7C8C"
+                android:centerColor="#8C0B4E5C"
+                android:endColor="#E60A3743" />
+        </shape>
+    </item>
+    <!-- 装饰性弧形高光线 -->
+    <item android:drawable="@drawable/osd_curve_line" />
+</layer-list>

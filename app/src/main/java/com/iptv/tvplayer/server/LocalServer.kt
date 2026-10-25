@@ -40,6 +40,14 @@ class LocalServer(private val context: Context, port: Int = 8080) : NanoHTTPD(po
         return this
     }
 
+    /** 上传文件名净化: 去掉路径部分, 拒绝目录穿越/非法字符 */
+    private fun safeFileName(raw: String, fallback: String): String {
+        val name = raw.substringAfterLast('/').substringAfterLast('\\').trim()
+        return if (name.isEmpty() || name.length > 100 || name.contains("..") ||
+            name.contains("?") || name.contains("\u0000")
+        ) fallback else name
+    }
+
     override fun serve(session: IHTTPSession): Response {
         val uri = session.uri
         val method = session.method
@@ -194,12 +202,16 @@ class LocalServer(private val context: Context, port: Int = 8080) : NanoHTTPD(po
                     val ipsList = socksIps.split(Regex("[\n/,\\s]+")).map { it.trim() }.filter { it.isNotEmpty() }
                     
                     kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                        val validIps = com.iptv.tvplayer.utils.ProxyUtils.filterValidSocks5Ips(ipsList)
-                        if (validIps.isNotEmpty()) {
-                            val currentGroups = com.iptv.tvplayer.data.SettingsManager.customSocksGroups.toMutableList()
-                            currentGroups.removeAll { it.name == socksName }
-                            currentGroups.add(com.iptv.tvplayer.data.SocksGroup(socksName, validIps))
-                            com.iptv.tvplayer.data.SettingsManager.customSocksGroups = currentGroups
+                        try {
+                            val validIps = com.iptv.tvplayer.utils.ProxyUtils.filterValidSocks5Ips(ipsList)
+                            if (validIps.isNotEmpty()) {
+                                val currentGroups = com.iptv.tvplayer.data.SettingsManager.customSocksGroups.toMutableList()
+                                currentGroups.removeAll { it.name == socksName }
+                                currentGroups.add(com.iptv.tvplayer.data.SocksGroup(socksName, validIps))
+                                com.iptv.tvplayer.data.SettingsManager.customSocksGroups = currentGroups
+                            }
+                        } catch (t: Throwable) {
+                            android.util.Log.e("LocalServer", "socks5 validation failed", t)
                         }
                     }
                     
@@ -256,7 +268,7 @@ class LocalServer(private val context: Context, port: Int = 8080) : NanoHTTPD(po
                 val listTempPath = files["list_file"]
                 if (!listTempPath.isNullOrBlank() && java.io.File(listTempPath).exists()) {
                     var fileName = (parms["list_filename"]?.firstOrNull() ?: parms["list_file"]?.firstOrNull() ?: "").fixEncoding()
-                    if (fileName.isBlank() || fileName.length > 100 || fileName.contains("?")) fileName = "list_${System.currentTimeMillis()}.txt"
+                    fileName = safeFileName(fileName, "list_${System.currentTimeMillis()}.txt")
                     
                     var targetDir = java.io.File(base, "list")
                     if (!targetDir.exists() && !targetDir.mkdirs()) {
@@ -288,7 +300,7 @@ class LocalServer(private val context: Context, port: Int = 8080) : NanoHTTPD(po
                 val jsTempPath = files["js_file"]
                 if (!jsTempPath.isNullOrBlank() && java.io.File(jsTempPath).exists()) {
                     var fileName = (parms["js_filename"]?.firstOrNull() ?: parms["js_file"]?.firstOrNull() ?: "").fixEncoding()
-                    if (fileName.isBlank() || fileName.length > 100 || fileName.contains("?")) fileName = "script_${System.currentTimeMillis()}.js"
+                    fileName = safeFileName(fileName, "script_${System.currentTimeMillis()}.js")
                     
                     var targetDir = java.io.File(base, "js")
                     if (!targetDir.exists() && !targetDir.mkdirs()) {
@@ -306,7 +318,7 @@ class LocalServer(private val context: Context, port: Int = 8080) : NanoHTTPD(po
                 val phpTempPath = files["php_file"]
                 if (!phpTempPath.isNullOrBlank() && java.io.File(phpTempPath).exists()) {
                     var fileName = (parms["php_filename"]?.firstOrNull() ?: parms["php_file"]?.firstOrNull() ?: "").fixEncoding()
-                    if (fileName.isBlank() || fileName.length > 100 || fileName.contains("?")) fileName = "script_${System.currentTimeMillis()}.php"
+                    fileName = safeFileName(fileName, "script_${System.currentTimeMillis()}.php")
                     
                     // .py → 摸鱼TV/py, .php → 摸鱼TV/php
                     val subDir = if (fileName.endsWith(".py", ignoreCase = true)) "py" else "php"

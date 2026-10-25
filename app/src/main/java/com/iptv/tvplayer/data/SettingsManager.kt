@@ -45,19 +45,22 @@ object SettingsManager {
     var localPlaylistPath = ""
 
     fun init(context: Context) {
+        if (this::prefs.isInitialized) return
         prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         localPlaylistPath = java.io.File(context.filesDir, "custom_playlist.txt").absolutePath
 
-        // Copy test.txt from assets to custom_playlist.txt
+        // Copy test.txt from assets to custom_playlist.txt (仅首次; 不能覆盖用户修改)
         val file = java.io.File(localPlaylistPath)
-        try {
-            context.assets.open("test.txt").use { input ->
-                file.outputStream().use { output ->
-                    input.copyTo(output)
+        if (!file.exists() || file.length() == 0L) {
+            try {
+                context.assets.open("test.txt").use { input ->
+                    file.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
 
         // Migrate old default single url to the new list format
