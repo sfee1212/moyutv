@@ -1,6 +1,6 @@
 {
-  "versionCode": 128,
-  "versionName": "1.2.8",
+  "versionCode": 127,
+  "versionName": "1.2.7",
   "updateUrl": "https://gh-proxy.com/https://github.com/sfee1212/moyutv/releases/download/v1.2.8/moyu_v1.2.8.apk",
   "updateInfo": "1.UI风格优化。\n2.兼容性提升 。\n3.应用已经完全开源，可以去项目主页获取源码自行编译。 "
 }
